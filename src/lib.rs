@@ -8,3 +8,4 @@ pub mod model_store;
 pub mod transcribe;
 #[cfg(feature = "whisper")]
 pub mod whisper;
+pub mod app;

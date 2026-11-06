@@ -26,6 +26,16 @@ The executable is `target\release\wdys.exe`.
 
 Logic tests run anywhere (including Linux/WSL): `cargo test --no-default-features`.
 
+From Ubuntu/WSL you can cross-build the Windows executable (and copy it somewhere) with
+`scripts/build-windows-from-wsl.sh /mnt/c/Tools/wdys`.
+
+## Icon
+
+The artwork is `resources/wdys-icon.png`. `python3 scripts/make-icons.py` (needs Pillow) cuts out the
+rounded tile and regenerates `resources/wdys.ico` (embedded in the exe) and `resources/tray-32.rgba`
+(the tray icon, which gets a small status dot: red recording, orange hands-free, violet transcribing,
+yellow error, none when ready). Both outputs are committed, so building needs no image tools.
+
 ## Manual verification checklist (Windows)
 
 - [ ] First run asks before downloading the model; declining shows a notice in the tray tooltip and does not crash.

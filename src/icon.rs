@@ -1,13 +1,27 @@
-/// Square RGBA image of a filled circle on a transparent background, for tray icons.
-pub fn circle_icon_rgba(size: u32, rgb: [u8; 3]) -> Vec<u8> {
-    let centre = (size as f32 - 1.0) / 2.0;
-    let radius = size as f32 / 2.0 - 1.0;
-    (0..size)
-        .flat_map(|y| (0..size).map(move |x| (x, y)))
-        .flat_map(|(x, y)| {
-            let (dx, dy) = (x as f32 - centre, y as f32 - centre);
-            let inside = (dx * dx + dy * dy).sqrt() <= radius;
-            [rgb[0], rgb[1], rgb[2], if inside { 255 } else { 0 }]
+const OUTER_RADIUS_FRACTION: f32 = 0.22;
+const RING_WIDTH_FRACTION: f32 = 0.0625;
+
+/// Returns a copy of `base` (square RGBA, `size` pixels a side) with a small status dot,
+/// ringed in white, in the bottom-right corner. `None` returns the base icon unchanged.
+pub fn with_status_dot(base: &[u8], size: u32, rgb: Option<[u8; 3]>) -> Vec<u8> {
+    let Some(rgb) = rgb else {
+        return base.to_vec();
+    };
+    let outer = (size as f32 * OUTER_RADIUS_FRACTION).round();
+    let ring = (size as f32 * RING_WIDTH_FRACTION).round().max(1.0);
+    let centre = size as f32 - outer - 1.0;
+    base.chunks_exact(4)
+        .enumerate()
+        .flat_map(|(i, px)| {
+            let (x, y) = ((i as u32 % size) as f32, (i as u32 / size) as f32);
+            let distance = ((x - centre).powi(2) + (y - centre).powi(2)).sqrt();
+            if distance > outer {
+                [px[0], px[1], px[2], px[3]]
+            } else if distance > outer - ring {
+                [255, 255, 255, 255]
+            } else {
+                [rgb[0], rgb[1], rgb[2], 255]
+            }
         })
         .collect()
 }

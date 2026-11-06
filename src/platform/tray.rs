@@ -1,0 +1,149 @@
+//! System tray icon and menu.
+
+use tray_icon::menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+
+use crate::app::{TrayState, UiEvent};
+use crate::config::{Config, ModelSize};
+use crate::error::PlatformError;
+use crate::icon::circle_icon_rgba;
+
+const ICON_SIZE: u32 = 32;
+const MAX_TOOLTIP_CHARS: usize = 120;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuAction {
+    SetHotkey,
+    UseModel(ModelSize),
+    ToggleStartup,
+    OpenConfig,
+    Quit,
+}
+
+pub struct TrayUi {
+    tray: TrayIcon,
+    set_hotkey: MenuItem,
+    base: CheckMenuItem,
+    small: CheckMenuItem,
+    startup: CheckMenuItem,
+    open_config: MenuItem,
+    quit: MenuItem,
+    last_error: Option<String>,
+}
+
+fn icon(rgb: [u8; 3]) -> Result<Icon, PlatformError> {
+    Icon::from_rgba(circle_icon_rgba(ICON_SIZE, rgb), ICON_SIZE, ICON_SIZE)
+        .map_err(|e| PlatformError::Tray(e.to_string()))
+}
+
+fn state_color(state: TrayState) -> [u8; 3] {
+    match state {
+        TrayState::Idle => [120, 120, 120],
+        TrayState::Recording => [220, 40, 40],
+        TrayState::HandsFree => [240, 150, 20],
+        TrayState::Transcribing => [50, 110, 230],
+    }
+}
+
+const ERROR_COLOR: [u8; 3] = [230, 200, 30];
+
+fn state_label(state: TrayState) -> &'static str {
+    match state {
+        TrayState::Idle => "wdys: ready",
+        TrayState::Recording => "wdys: recording (release to transcribe)",
+        TrayState::HandsFree => "wdys: hands-free recording (press again to stop)",
+        TrayState::Transcribing => "wdys: transcribing",
+    }
+}
+
+impl TrayUi {
+    pub fn new(config: &Config) -> Result<TrayUi, PlatformError> {
+        let tray_err = |e: tray_icon::menu::Error| PlatformError::Tray(e.to_string());
+        let menu = Menu::new();
+        let set_hotkey = MenuItem::new("Set hotkey...", true, None);
+        let base = CheckMenuItem::new("Model: base (faster)", true, config.model == ModelSize::BaseEn, None);
+        let small = CheckMenuItem::new("Model: small (more accurate)", true, config.model == ModelSize::SmallEn, None);
+        let startup = CheckMenuItem::new("Start with Windows", true, config.start_with_windows, None);
+        let open_config = MenuItem::new("Open config file", true, None);
+        let quit = MenuItem::new("Quit", true, None);
+        menu.append(&set_hotkey).map_err(tray_err)?;
+        menu.append(&PredefinedMenuItem::separator()).map_err(tray_err)?;
+        menu.append(&base).map_err(tray_err)?;
+        menu.append(&small).map_err(tray_err)?;
+        menu.append(&PredefinedMenuItem::separator()).map_err(tray_err)?;
+        menu.append(&startup).map_err(tray_err)?;
+        menu.append(&open_config).map_err(tray_err)?;
+        menu.append(&PredefinedMenuItem::separator()).map_err(tray_err)?;
+        menu.append(&quit).map_err(tray_err)?;
+        let tray = TrayIconBuilder::new()
+            .with_menu(Box::new(menu))
+            .with_icon(icon(state_color(TrayState::Idle))?)
+            .with_tooltip(state_label(TrayState::Idle))
+            .build()
+            .map_err(|e| PlatformError::Tray(e.to_string()))?;
+        Ok(TrayUi { tray, set_hotkey, base, small, startup, open_config, quit, last_error: None })
+    }
+
+    pub fn action_for(&self, id: &MenuId) -> Option<MenuAction> {
+        let table: [(&MenuId, MenuAction); 6] = [
+            (self.set_hotkey.id(), MenuAction::SetHotkey),
+            (self.base.id(), MenuAction::UseModel(ModelSize::BaseEn)),
+            (self.small.id(), MenuAction::UseModel(ModelSize::SmallEn)),
+            (self.startup.id(), MenuAction::ToggleStartup),
+            (self.open_config.id(), MenuAction::OpenConfig),
+            (self.quit.id(), MenuAction::Quit),
+        ];
+        table.into_iter().find(|(candidate, _)| *candidate == id).map(|(_, action)| action)
+    }
+
+    /// Whether the "Start with Windows" box is checked after the click that just happened.
+    pub fn startup_checked(&self) -> bool {
+        self.startup.is_checked()
+    }
+
+    pub fn show_model(&self, size: ModelSize) {
+        self.base.set_checked(size == ModelSize::BaseEn);
+        self.small.set_checked(size == ModelSize::SmallEn);
+    }
+
+    pub fn set_startup_checked(&self, checked: bool) {
+        self.startup.set_checked(checked);
+    }
+
+    pub fn show_info(&self, text: &str) {
+        self.set_tooltip(text);
+    }
+
+    /// Reflects pipeline events: icon colour per state, errors kept in the tooltip until the next recording.
+    pub fn apply(&mut self, event: &UiEvent) {
+        match event {
+            UiEvent::Tray(state) => {
+                if *state == TrayState::Recording {
+                    self.last_error = None;
+                }
+                let color = match (&self.last_error, state) {
+                    (Some(_), TrayState::Idle) => ERROR_COLOR,
+                    _ => state_color(*state),
+                };
+                if let Ok(icon) = icon(color) {
+                    let _ = self.tray.set_icon(Some(icon));
+                }
+                let label = match (&self.last_error, state) {
+                    (Some(error), TrayState::Idle) => error.clone(),
+                    _ => state_label(*state).to_string(),
+                };
+                self.set_tooltip(&label);
+            }
+            UiEvent::Notify(message) => {
+                self.last_error = Some(message.clone());
+                self.set_tooltip(message);
+            }
+            UiEvent::Cue(_) => {}
+        }
+    }
+
+    fn set_tooltip(&self, text: &str) {
+        let clipped: String = text.chars().take(MAX_TOOLTIP_CHARS).collect();
+        let _ = self.tray.set_tooltip(Some(clipped));
+    }
+}

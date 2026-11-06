@@ -1,6 +1,7 @@
 //! Simulated Ctrl+V and live key state.
 
 use std::mem::size_of;
+use std::sync::Arc;
 
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
@@ -10,6 +11,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use crate::config::VirtualKey;
 use crate::error::PasteError;
 use crate::paste::Keyboard;
+use crate::platform::hook::KeyTracker;
 
 const VK_V: VIRTUAL_KEY = VIRTUAL_KEY(0x56);
 
@@ -20,7 +22,17 @@ fn key_event(key: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
     }
 }
 
-pub struct WinKeyboard;
+/// Reads the live hotkey from the tracker, so changing the hotkey from the tray
+/// takes effect without rebuilding the app.
+pub struct WinKeyboard {
+    tracker: Arc<KeyTracker>,
+}
+
+impl WinKeyboard {
+    pub fn new(tracker: Arc<KeyTracker>) -> WinKeyboard {
+        WinKeyboard { tracker }
+    }
+}
 
 impl Keyboard for WinKeyboard {
     fn send_paste(&mut self) -> Result<(), PasteError> {
@@ -39,8 +51,8 @@ impl Keyboard for WinKeyboard {
         }
     }
 
-    fn is_down(&self, key: VirtualKey) -> bool {
+    fn is_down(&self, _key: VirtualKey) -> bool {
         // SAFETY: GetAsyncKeyState has no preconditions.
-        unsafe { GetAsyncKeyState(key.0 as i32) < 0 }
+        unsafe { GetAsyncKeyState(self.tracker.hotkey().0 as i32) < 0 }
     }
 }

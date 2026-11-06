@@ -72,3 +72,21 @@ pub enum HookError {
     #[error("timed out waiting for a key press")]
     CaptureTimeout,
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum PlatformError {
+    #[error("registry error: {0}")]
+    Registry(String),
+    #[error("tray error: {0}")]
+    Tray(String),
+    #[error("I/O error: {0}")]
+    Io(#[from] io::Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InstanceError {
+    #[error("wdys is already running")]
+    AlreadyRunning,
+    #[error("could not create instance lock: {0}")]
+    Os(String),
+}

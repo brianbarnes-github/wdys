@@ -11,3 +11,4 @@ pub mod whisper;
 pub mod app;
 #[cfg(windows)]
 pub mod platform;
+pub mod icon;

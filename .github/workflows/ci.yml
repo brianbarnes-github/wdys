@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test, lint, and type-check the Windows layer
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain pieces
+        run: |
+          rustup toolchain install stable --profile minimal -c rustfmt -c clippy -t x86_64-pc-windows-gnu
+          rustup default stable
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mingw-w64
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ci-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ci-${{ runner.os }}-
+      - run: cargo fmt --check
+      - run: cargo clippy --no-default-features --all-targets -- -D warnings
+      - run: cargo test --no-default-features
+      - name: Type-check and lint the Windows-only code
+        run: cargo clippy --no-default-features --target x86_64-pc-windows-gnu --all-targets -- -D warnings
+
+  whisper:
+    name: Whisper engine compiles
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake libclang-dev
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: whisper-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: whisper-${{ runner.os }}-
+      - run: cargo check --features whisper

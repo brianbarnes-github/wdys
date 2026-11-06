@@ -1,4 +1,9 @@
-# Voice Dictation Tool — Design
+# wdys: design notes
+
+> This is the design document written before the first implementation, kept for background. Where it differs
+> from the code or the README (for example the default hotkey, now F9, and the hotkey being blocked), the code
+> and README are current. It was written in a collaboration between the author and an AI assistant, which is why
+> some decisions are attributed to "the user" and "Claude".
 
 ## Intent and why
 

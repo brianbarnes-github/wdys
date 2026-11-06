@@ -1,0 +1,65 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds wdys.exe and publishes it as a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-exe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the crate version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          crate=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "$version" != "$crate" ]; then
+            echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $crate" >&2
+            exit 1
+          fi
+
+      - name: Install toolchain pieces
+        run: |
+          rustup toolchain install stable --profile minimal -t x86_64-pc-windows-gnu
+          rustup default stable
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mingw-w64 cmake libclang-dev zip
+
+      - name: Run the tests
+        run: cargo test --no-default-features
+
+      - name: Build wdys.exe
+        run: scripts/build-windows-from-wsl.sh
+
+      - name: Package
+        run: |
+          name="wdys-${GITHUB_REF_NAME}-windows-x64"
+          mkdir -p "dist/$name"
+          cp target/x86_64-pc-windows-gnu/release/wdys.exe README.md LICENSE THIRD_PARTY_NOTICES.md "dist/$name/"
+          (cd dist && zip -r "$name.zip" "$name")
+          (cd dist && sha256sum "$name.zip" "$name/wdys.exe" | sed "s#$name/##" > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+
+      - name: Release notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '$0 ~ "^## " v "$" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "### Install"
+            echo "Download the zip below, unzip it, and run \`wdys.exe\`. See the [README](https://github.com/${GITHUB_REPOSITORY}#download-and-install)."
+            echo "Windows may show a SmartScreen warning because the app is unsigned; compare \`SHA256SUMS.txt\` if you want to verify the download."
+          } >> notes.md
+          cat notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt \
+            --title "wdys $GITHUB_REF_NAME" --notes-file notes.md

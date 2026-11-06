@@ -2,6 +2,15 @@
 name = "wdys"
 version = "0.1.0"
 edition = "2021"
+description = "What did you say? Private, local voice dictation for Windows: hold a key, speak, and the text is pasted."
+license = "MIT"
+repository = "https://github.com/brianbarnes-github/wdys"
+homepage = "https://github.com/brianbarnes-github/wdys"
+readme = "README.md"
+authors = ["Brian Barnes"]
+keywords = ["dictation", "speech-to-text", "whisper", "windows", "tray"]
+categories = ["multimedia::audio", "accessibility"]
+publish = false
 
 [features]
 default = ["whisper"]

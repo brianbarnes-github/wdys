@@ -4,3 +4,4 @@ pub mod filler;
 pub mod hotkey;
 pub mod audio;
 pub mod paste;
+pub mod model_store;

@@ -35,7 +35,7 @@ app currently has focus.
 - Noticeable idle resource use, or slow startup of each dictation.
 - Any audio or text leaving the machine.
 - Clobbering the user's clipboard permanently after a paste.
-- Interfering with the user's normal use of the hotkey in other apps.
+- The hotkey leaking into the app being dictated into (stray characters or shortcuts).
 - Recording that gets stuck on with no way to tell.
 
 ## Decisions made by the user
@@ -43,7 +43,9 @@ app currently has focus.
 - Local-only transcription.
 - Hold the key to record; double-press for hands-free.
 - The hotkey is user-defined (set from the tray).
-- The hotkey is NOT blocked: the keypress still reaches the focused app.
+- The hotkey IS blocked: while wdys runs, the hotkey is swallowed and never reaches any app
+  (changed from an earlier "don't block it" decision, at the user's request). Consequence: that
+  key stops working normally everywhere, so pick one you never use.
 - English only.
 - The builder (Claude) chooses language and toolchain, within the
   lightweight and local constraints.
@@ -68,9 +70,9 @@ app currently has focus.
   maximum recording length also ends it, so it can never run indefinitely.
 - **Startup:** tray toggle "Start with Windows", off by default.
 - **Hotkey setup:** tray item "Set hotkey" — click, press the desired key, it
-  is saved to a config file and applied immediately. Recommended keys are
-  rarely-used ones (Right Ctrl, Scroll Lock, F-keys, a mouse side button);
-  since the key is not blocked, common typing keys are a poor choice.
+  is saved to a config file and applied immediately. Because the key is
+  blocked system-wide, pick one you never use (an F-key, Scroll Lock);
+  a typing key or a modifier like Ctrl would break normal use. Default: F9.
 - **Config:** a small config file (hotkey, model size, max recording length,
   idle unload timeout, sound on/off, start-with-Windows).
 - **Dependencies (new; to be mentioned at implementation time):** `whisper-rs`,
@@ -89,8 +91,9 @@ checksum-verified.
 ## Further calls by Claude (after builder review; not yet approved by the user)
 
 - **Hotkey types:** keyboard keys only in v1 (no mouse buttons). Key
-  auto-repeat is ignored. Chords with a modifier hotkey (e.g. Ctrl+C while
-  Right Ctrl is the hotkey) may leak through, since the key is not blocked.
+  auto-repeat is collapsed to one key-down and swallowed with the hotkey.
+  Injected (software-generated) key events, such as our own Ctrl+V, are never
+  blocked or acted on.
   Paste is always sent after the hotkey has been released, and the paste
   step waits for the hotkey to be up.
 - **Tap vs double-press:** recording starts immediately on key-down (lowest
@@ -108,8 +111,9 @@ checksum-verified.
 - **Audio device:** default input device only. Missing or disconnected
   device surfaces a tray notification and ends the recording.
 - **Stuck-recording safeguard:** the maximum recording length applies to both
-  hold-to-talk and hands-free (default 120 s). Key state is also polled so a
-  lost key-up ends recording.
+  hold-to-talk and hands-free (default 120 s), which is what ends a recording
+  whose key-up was lost. (OS key-state polling is not used: a swallowed key never
+  registers with Windows, so `GetAsyncKeyState` would always report it up.)
 - **Build:** release builds are made on Windows. Logic sits behind traits so
   it tests on Linux/WSL. Only one instance may run at a time.
 

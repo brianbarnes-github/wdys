@@ -32,7 +32,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            hotkey: VirtualKey(0xA3),
+            hotkey: VirtualKey(0x78), // F9: the hotkey is blocked system-wide, so avoid a typing key
             model: ModelSize::BaseEn,
             max_recording_secs: 120,
             idle_unload_secs: 600,

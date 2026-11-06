@@ -8,7 +8,7 @@ fn missing_file_yields_defaults() {
     let dir = tempfile::tempdir().unwrap();
     let config = load(&dir.path().join("nope.toml")).unwrap();
     assert_eq!(config, Config::default());
-    assert_eq!(Config::default().hotkey, VirtualKey(0xA3));
+    assert_eq!(Config::default().hotkey, VirtualKey(0x78));
 }
 
 #[test]
@@ -39,6 +39,9 @@ fn partial_file_fills_missing_fields_with_defaults() {
     fs::write(&path, "sounds = false\n").unwrap();
     let config = load(&path).unwrap();
     assert!(!config.sounds);
-    assert_eq!(config.max_recording_secs, Config::default().max_recording_secs);
-    assert_eq!(config.hotkey, VirtualKey(0xA3));
+    assert_eq!(
+        config.max_recording_secs,
+        Config::default().max_recording_secs
+    );
+    assert_eq!(config.hotkey, VirtualKey(0x78));
 }

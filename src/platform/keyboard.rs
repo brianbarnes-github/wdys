@@ -4,7 +4,7 @@ use std::mem::size_of;
 use std::sync::Arc;
 
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
     VIRTUAL_KEY, VK_CONTROL,
 };
 
@@ -18,11 +18,19 @@ const VK_V: VIRTUAL_KEY = VIRTUAL_KEY(0x56);
 fn key_event(key: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
     INPUT {
         r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: key, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 } },
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: key,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
     }
 }
 
-/// Reads the live hotkey from the tracker, so changing the hotkey from the tray
+/// Asks the hook whether the live hotkey is held, so changing the hotkey from the tray
 /// takes effect without rebuilding the app.
 pub struct WinKeyboard {
     tracker: Arc<KeyTracker>,
@@ -47,12 +55,15 @@ impl Keyboard for WinKeyboard {
         if sent as usize == inputs.len() {
             Ok(())
         } else {
-            Err(PasteError::Input(format!("only {sent} of {} key events were accepted", inputs.len())))
+            Err(PasteError::Input(format!(
+                "only {sent} of {} key events were accepted",
+                inputs.len()
+            )))
         }
     }
 
     fn is_down(&self, _key: VirtualKey) -> bool {
-        // SAFETY: GetAsyncKeyState has no preconditions.
-        unsafe { GetAsyncKeyState(self.tracker.hotkey().0 as i32) < 0 }
+        // The hotkey is swallowed by the hook, so Windows never sees it pressed; ask the hook.
+        self.tracker.is_down()
     }
 }

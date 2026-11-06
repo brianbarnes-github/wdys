@@ -7,7 +7,7 @@ text is pasted into whatever app has focus.
 - **Hold the hotkey** to record, **release** to transcribe and paste.
 - **Double-press** the hotkey for hands-free recording; press once more to stop.
 - Lives in the system tray; the hotkey, model size and "Start with Windows" are set from its menu.
-- Default hotkey: Right Ctrl. English only. CPU only. Audio and text never leave your machine.
+- Default hotkey: F9, blocked everywhere while wdys runs (pick a key you never use). English only. CPU only. Audio and text never leave your machine.
 - The only network use is a one-time model download (asks first, checksum-verified).
 
 Settings live in `%APPDATA%\wdys\config.toml`; models in `%APPDATA%\wdys\models`.
@@ -39,7 +39,7 @@ yellow error, none when ready). Both outputs are committed, so building needs no
 ## Manual verification checklist (Windows)
 
 - [ ] First run asks before downloading the model; declining shows a notice in the tray tooltip and does not crash.
-- [ ] Hold Right Ctrl, speak, release: text appears in Notepad and in a browser text box.
+- [ ] Hold F9, speak, release: text appears in Notepad and in a browser text box, and no F9 keypress reaches the app (e.g. F9 does nothing in a browser).
 - [ ] "um" and "uh" are gone from the pasted text.
 - [ ] Text that was on the clipboard before dictating is back on the clipboard afterwards.
 - [ ] Double-press starts hands-free (tray icon turns orange); one more press stops and pastes.

@@ -7,6 +7,8 @@ text is pasted into whatever app has focus.
 - **Hold the hotkey** to record, **release** to transcribe and paste.
 - **Double-press** the hotkey for hands-free recording; press once more to stop.
 - Lives in the system tray; the hotkey, model size and "Start with Windows" are set from its menu.
+- If a paste fails, your text is left on the clipboard (with a toast saying so). The tray's "Copy last transcript"
+  puts the most recent text back on the clipboard any time. Only the last transcript is kept, in memory only.
 - Default hotkey: F9, blocked everywhere while wdys runs (pick a key you never use). English only. CPU only. Audio and text never leave your machine.
 - The only network use is a one-time model download (asks first, checksum-verified).
 
@@ -44,6 +46,8 @@ yellow error, none when ready). Both outputs are committed, so building needs no
 - [ ] Text that was on the clipboard before dictating is back on the clipboard afterwards.
 - [ ] Double-press starts hands-free: a small pill with a pulsing red dot and the mic icon appears at the top centre of the screen (and the tray dot turns orange); one more press hides it, stops, and pastes.
 - [ ] A quick tap does nothing.
+- [ ] Tray > "Copy last transcript" puts the last dictation on the clipboard (Ctrl+V pastes it) and shows a toast; before any dictation it says there is nothing to copy.
+- [ ] Hold the hotkey past the end of a recording (or paste into a window that blocks input): a toast says the text is on the clipboard, and Ctrl+V pastes it.
 - [ ] Tray > "Set hotkey...": a "Select your key" toast appears; press a key and a "Hotkey set" toast names it. The new key works, and still does after restarting wdys.
 - [ ] A second launch is refused with a message.
 - [ ] Unplugging the microphone mid-recording shows a notice in the tray tooltip and wdys recovers.

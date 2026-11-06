@@ -15,11 +15,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MB_ICONQUESTION, MB_OK, MB_TOPMOST, MB_YESNO, MSG, WM_APP, WM_TIMER,
 };
 
-use wdys::app::{run_worker, App, Cue, UiEvent};
+use wdys::app::{run_worker, App, Cue, TranscriptStore, UiEvent};
 use wdys::config::{self, Config, ModelSize, VirtualKey};
 use wdys::error::InstanceError;
 use wdys::hotkey::{Input, Millis};
 use wdys::keys::key_name;
+use wdys::paste::Clipboard;
 use wdys::model_store::{ensure_model, model_path, model_sha256, Consent, UreqDownloader};
 use wdys::platform::autostart;
 use wdys::platform::clipboard::WinClipboard;
@@ -31,6 +32,7 @@ use wdys::platform::recorder::CpalRecorder;
 use wdys::platform::overlay::Overlay;
 use wdys::platform::toast::Toaster;
 use wdys::platform::tray::{MenuAction, TrayUi};
+use wdys::toast::preview;
 use wdys::transcribe::{LazyModel, ModelLoader};
 
 const TICK_INTERVAL: Duration = Duration::from_millis(200);
@@ -114,6 +116,7 @@ fn spawn_worker(
     tracker: Arc<KeyTracker>,
     rx: mpsc::Receiver<(Input, Millis)>,
     mailbox: Mailbox,
+    transcript: TranscriptStore,
 ) {
     thread::spawn(move || {
         let path = ensure_model(&models_dir, config.model, &UreqDownloader, &DialogConsent, model_sha256(config.model))
@@ -133,7 +136,8 @@ fn spawn_worker(
             WinClipboard,
             WinKeyboard::new(tracker),
             Box::new(thread::sleep),
-        );
+        )
+        .with_transcript_store(transcript);
         run_worker(rx, &mut app, &|event| match event {
             UiEvent::Cue(cue) => play_cue(cue),
             other => mailbox.send(MainMsg::Ui(other)),
@@ -201,7 +205,8 @@ pub fn main() {
     let mut overlay = Overlay::new().ok();
     MenuEvent::set_event_handler(Some(move |event: MenuEvent| menu_mailbox.send(MainMsg::Menu(event.id))));
 
-    spawn_worker(config.clone(), dir.join("models"), tracker.clone(), input_rx, mailbox.clone());
+    let transcript = TranscriptStore::default();
+    spawn_worker(config.clone(), dir.join("models"), tracker.clone(), input_rx, mailbox.clone(), transcript.clone());
 
     let mut capturing = false;
     let mut msg = MSG::default();
@@ -221,6 +226,9 @@ pub fn main() {
             match message {
                 MainMsg::Ui(event) => {
                     tray.apply(&event);
+                    if let UiEvent::Notify(message) = &event {
+                        announce(toaster.as_ref(), &tray, "wdys", message);
+                    }
                     if let Some(overlay) = overlay.as_mut() {
                         overlay.apply(&event);
                     }
@@ -259,6 +267,16 @@ pub fn main() {
                         });
                     }
                     Some(MenuAction::SetHotkey) => {}
+                    Some(MenuAction::CopyLastTranscript) => {
+                        let latest = transcript.lock().ok().and_then(|t| t.clone());
+                        match latest {
+                            None => announce(toaster.as_ref(), &tray, "Nothing to copy", "Nothing has been transcribed yet."),
+                            Some(text) => match WinClipboard.set_text(&text, false) {
+                                Ok(()) => announce(toaster.as_ref(), &tray, "Copied last transcript", &preview(&text, 80)),
+                                Err(e) => announce(toaster.as_ref(), &tray, "Could not copy", &e.to_string()),
+                            },
+                        }
+                    }
                     Some(MenuAction::UseModel(size)) => {
                         config.model = size;
                         tray.show_model(size);

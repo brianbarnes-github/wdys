@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::sync::mpsc::{self, Sender};
 use std::time::Duration;
 
-use wdys::app::{run_worker, App, Cue, TrayState, UiEvent};
+use wdys::app::{run_worker, App, Cue, TranscriptStore, TrayState, UiEvent};
 use wdys::audio::{AudioClip, Recorder};
 use wdys::config::{Config, VirtualKey};
 use wdys::error::{AudioError, PasteError, TranscribeError};
@@ -116,10 +116,14 @@ impl Clipboard for FakeClipboard {
 struct FakeKeyboard {
     content: Shared<Option<String>>,
     pasted: Shared<Vec<String>>,
+    fail_paste: Rc<Cell<bool>>,
 }
 
 impl Keyboard for FakeKeyboard {
     fn send_paste(&mut self) -> Result<(), PasteError> {
+        if self.fail_paste.get() {
+            return Err(PasteError::Input("blocked".into()));
+        }
         self.pasted.borrow_mut().push(self.content.borrow().clone().unwrap_or_default());
         Ok(())
     }
@@ -136,6 +140,8 @@ struct Rig {
     content: Shared<Option<String>>,
     writes: Shared<Vec<String>>,
     pasted: Shared<Vec<String>>,
+    store: TranscriptStore,
+    fail_paste: Rc<Cell<bool>>,
 }
 
 fn rig_with(transcript: &str, config: Config, extra: Option<Sender<Wake>>) -> Rig {
@@ -151,15 +157,18 @@ fn rig_with(transcript: &str, config: Config, extra: Option<Sender<Wake>>) -> Ri
     };
     let idle = Millis::from(config.idle_unload_secs) * 1000;
     let model = LazyModel::new(Box::new(loader), "m.bin".into(), idle);
+    let store = TranscriptStore::default();
+    let fail_paste = Rc::new(Cell::new(false));
     let app = App::new(
         config,
         FakeRecorder(rec.clone()),
         model,
         FakeClipboard { content: content.clone(), writes: writes.clone() },
-        FakeKeyboard { content: content.clone(), pasted: pasted.clone() },
+        FakeKeyboard { content: content.clone(), pasted: pasted.clone(), fail_paste: fail_paste.clone() },
         Box::new(|_: Duration| {}),
-    );
-    Rig { app, rec, loads, model_calls, content, writes, pasted }
+    )
+    .with_transcript_store(store.clone());
+    Rig { app, rec, loads, model_calls, content, writes, pasted, store, fail_paste }
 }
 
 fn rig(transcript: &str) -> Rig {
@@ -336,4 +345,53 @@ fn error_cue_respects_the_sounds_setting() {
     r.rec.borrow_mut().fail_next_start = true;
     let events = play(&mut r, &[(KeyDown, 0)]);
     assert!(!events.iter().any(|e| matches!(e, UiEvent::Cue(_))));
+}
+
+fn remembered(r: &Rig) -> Option<String> {
+    r.store.lock().unwrap().clone()
+}
+
+#[test]
+fn the_cleaned_transcript_is_remembered_for_copy_last() {
+    let mut r = rig("Um, hello world");
+    play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
+    assert_eq!(remembered(&r), Some("Hello world".to_string()));
+}
+
+#[test]
+fn a_failed_paste_keeps_the_text_on_the_clipboard_and_remembered_and_says_so() {
+    let mut r = rig("hello");
+    r.fail_paste.set(true);
+    let events = play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
+    assert_eq!(*r.content.borrow(), Some("hello".to_string()));
+    assert_eq!(remembered(&r), Some("hello".to_string()));
+    assert!(events.iter().any(|e| matches!(e, UiEvent::Notify(m) if m.contains("clipboard"))));
+}
+
+#[test]
+fn nothing_is_remembered_for_silent_or_filler_only_recordings() {
+    let mut r = rig("Um, uh.");
+    play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
+    assert_eq!(remembered(&r), None);
+    let mut silent = rig("hello");
+    silent.rec.borrow_mut().silent = true;
+    play(&mut silent, &[(KeyDown, 0), (KeyUp, 1_000)]);
+    assert_eq!(remembered(&silent), None);
+}
+
+#[test]
+fn an_empty_recording_does_not_erase_the_previous_transcript() {
+    let mut r = rig("hello");
+    play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
+    r.rec.borrow_mut().silent = true;
+    play(&mut r, &[(KeyDown, 2_000), (KeyUp, 3_000)]);
+    assert_eq!(remembered(&r), Some("hello".to_string()));
+}
+
+#[test]
+fn a_new_transcript_replaces_the_previous_one() {
+    let mut r = rig("fresh words");
+    *r.store.lock().unwrap() = Some("stale words".to_string());
+    play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
+    assert_eq!(remembered(&r), Some("fresh words".to_string()));
 }

@@ -13,6 +13,7 @@ type Shared<T> = Rc<RefCell<T>>;
 struct FakeClipboard {
     content: Shared<Option<String>>,
     writes: Shared<Vec<(String, bool)>>,
+    fail_set: bool,
 }
 
 impl Clipboard for FakeClipboard {
@@ -20,6 +21,9 @@ impl Clipboard for FakeClipboard {
         Ok(self.content.borrow().clone())
     }
     fn set_text(&mut self, text: &str, exclude: bool) -> Result<(), PasteError> {
+        if self.fail_set {
+            return Err(PasteError::Clipboard("busy".into()));
+        }
         self.writes.borrow_mut().push((text.to_string(), exclude));
         *self.content.borrow_mut() = Some(text.to_string());
         Ok(())
@@ -63,12 +67,12 @@ struct Rig {
     pasted: Shared<Vec<Option<String>>>,
 }
 
-fn rig(initial: Option<&str>, down_polls: u32, fail_paste: bool) -> Rig {
+fn rig_with(initial: Option<&str>, down_polls: u32, fail_paste: bool, fail_set: bool) -> Rig {
     let content = Rc::new(RefCell::new(initial.map(String::from)));
     let writes = Rc::new(RefCell::new(Vec::new()));
     let pasted = Rc::new(RefCell::new(Vec::new()));
     Rig {
-        clipboard: FakeClipboard { content: content.clone(), writes: writes.clone() },
+        clipboard: FakeClipboard { content: content.clone(), writes: writes.clone(), fail_set },
         keyboard: FakeKeyboard {
             clipboard: content.clone(),
             pasted: pasted.clone(),
@@ -79,6 +83,10 @@ fn rig(initial: Option<&str>, down_polls: u32, fail_paste: bool) -> Rig {
         writes,
         pasted,
     }
+}
+
+fn rig(initial: Option<&str>, down_polls: u32, fail_paste: bool) -> Rig {
+    rig_with(initial, down_polls, fail_paste, false)
 }
 
 fn no_sleep(_: Duration) {}
@@ -119,18 +127,40 @@ fn waits_for_hotkey_release() {
 }
 
 #[test]
-fn held_hotkey_times_out() {
+fn held_hotkey_leaves_the_text_on_the_clipboard() {
     let mut r = rig(Some("previous"), u32::MAX, false);
     let result = paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hi", &no_sleep);
-    assert!(matches!(result, Err(PasteError::HotkeyStillHeld)));
+    assert!(matches!(result, Err(PasteError::TextOnClipboard(_))));
     assert!(r.pasted.borrow().is_empty());
-    assert_eq!(*r.content.borrow(), Some("previous".to_string()));
+    assert_eq!(*r.content.borrow(), Some("hi".to_string()));
 }
 
 #[test]
-fn restores_even_when_paste_fails() {
+fn failed_paste_leaves_the_text_on_the_clipboard_instead_of_restoring() {
     let mut r = rig(Some("previous"), 0, true);
     let result = paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hi", &no_sleep);
-    assert!(matches!(result, Err(PasteError::Input(_))));
-    assert_eq!(*r.content.borrow(), Some("previous".to_string()));
+    assert!(matches!(result, Err(PasteError::TextOnClipboard(_))));
+    assert_eq!(*r.content.borrow(), Some("hi".to_string()));
+}
+
+#[test]
+fn rescue_copy_is_a_normal_clipboard_entry() {
+    let mut r = rig(None, 0, true);
+    let _ = paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hi", &no_sleep);
+    assert_eq!(r.writes.borrow().last(), Some(&("hi".to_string(), false)));
+}
+
+#[test]
+fn if_even_the_rescue_copy_fails_the_original_problem_is_reported() {
+    let mut r = rig_with(Some("previous"), u32::MAX, false, true);
+    let result = paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hi", &no_sleep);
+    assert!(matches!(result, Err(PasteError::HotkeyStillHeld)));
+}
+
+#[test]
+fn the_message_tells_the_user_how_to_recover() {
+    let mut r = rig(None, 0, true);
+    let error = paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hi", &no_sleep).unwrap_err();
+    assert!(error.to_string().contains("clipboard"));
+    assert!(error.to_string().contains("Ctrl+V"));
 }

@@ -21,3 +21,13 @@ pub fn toast_xml(title: &str, body: &str) -> String {
         escape(body)
     )
 }
+
+/// One-line preview of `text`, at most `max_chars` characters, for messages.
+pub fn preview(text: &str, max_chars: usize) -> String {
+    let single_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if single_line.chars().count() <= max_chars {
+        single_line
+    } else {
+        single_line.chars().take(max_chars).chain(std::iter::once('\u{2026}')).collect()
+    }
+}

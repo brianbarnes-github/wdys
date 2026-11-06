@@ -14,6 +14,7 @@ const MAX_TOOLTIP_CHARS: usize = 120;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuAction {
     SetHotkey,
+    CopyLastTranscript,
     UseModel(ModelSize),
     ToggleStartup,
     OpenConfig,
@@ -23,6 +24,7 @@ pub enum MenuAction {
 pub struct TrayUi {
     tray: TrayIcon,
     set_hotkey: MenuItem,
+    copy_last: MenuItem,
     base: CheckMenuItem,
     small: CheckMenuItem,
     startup: CheckMenuItem,
@@ -65,12 +67,14 @@ impl TrayUi {
         let tray_err = |e: tray_icon::menu::Error| PlatformError::Tray(e.to_string());
         let menu = Menu::new();
         let set_hotkey = MenuItem::new("Set hotkey...", true, None);
+        let copy_last = MenuItem::new("Copy last transcript", true, None);
         let base = CheckMenuItem::new("Model: base (faster)", true, config.model == ModelSize::BaseEn, None);
         let small = CheckMenuItem::new("Model: small (more accurate)", true, config.model == ModelSize::SmallEn, None);
         let startup = CheckMenuItem::new("Start with Windows", true, config.start_with_windows, None);
         let open_config = MenuItem::new("Open config file", true, None);
         let quit = MenuItem::new("Quit", true, None);
         menu.append(&set_hotkey).map_err(tray_err)?;
+        menu.append(&copy_last).map_err(tray_err)?;
         menu.append(&PredefinedMenuItem::separator()).map_err(tray_err)?;
         menu.append(&base).map_err(tray_err)?;
         menu.append(&small).map_err(tray_err)?;
@@ -85,12 +89,13 @@ impl TrayUi {
             .with_tooltip(state_label(TrayState::Idle))
             .build()
             .map_err(|e| PlatformError::Tray(e.to_string()))?;
-        Ok(TrayUi { tray, set_hotkey, base, small, startup, open_config, quit, last_error: None })
+        Ok(TrayUi { tray, set_hotkey, copy_last, base, small, startup, open_config, quit, last_error: None })
     }
 
     pub fn action_for(&self, id: &MenuId) -> Option<MenuAction> {
-        let table: [(&MenuId, MenuAction); 6] = [
+        let table: [(&MenuId, MenuAction); 7] = [
             (self.set_hotkey.id(), MenuAction::SetHotkey),
+            (self.copy_last.id(), MenuAction::CopyLastTranscript),
             (self.base.id(), MenuAction::UseModel(ModelSize::BaseEn)),
             (self.small.id(), MenuAction::UseModel(ModelSize::SmallEn)),
             (self.startup.id(), MenuAction::ToggleStartup),

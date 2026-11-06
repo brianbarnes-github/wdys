@@ -32,6 +32,9 @@ pub enum UiEvent {
 }
 
 /// Wires the hotkey state machine to recording, transcription, cleanup and paste.
+/// The most recent transcript, shared so the tray can offer "Copy last transcript".
+pub type TranscriptStore = std::sync::Arc<std::sync::Mutex<Option<String>>>;
+
 pub struct App<R: Recorder, C: Clipboard, K: Keyboard> {
     config: Config,
     fsm: FsmConfig,
@@ -41,6 +44,7 @@ pub struct App<R: Recorder, C: Clipboard, K: Keyboard> {
     clipboard: C,
     keyboard: K,
     sleep: Box<dyn Fn(Duration)>,
+    transcript: TranscriptStore,
 }
 
 impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
@@ -53,7 +57,23 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
         sleep: Box<dyn Fn(Duration)>,
     ) -> Self {
         let fsm = FsmConfig::from(&config);
-        Self { config, fsm, state: State::Idle, recorder, model, clipboard, keyboard, sleep }
+        Self {
+            config,
+            fsm,
+            state: State::Idle,
+            recorder,
+            model,
+            clipboard,
+            keyboard,
+            sleep,
+            transcript: TranscriptStore::default(),
+        }
+    }
+
+    /// Uses `store` (shared with the tray) to remember the latest transcript.
+    pub fn with_transcript_store(mut self, store: TranscriptStore) -> Self {
+        self.transcript = store;
+        self
     }
 
     pub fn state(&self) -> State {
@@ -150,6 +170,12 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
         }
         let raw = self.model.transcribe(&clip, now)?;
         let text = clean_transcript(&raw);
+        // Remember it before pasting, so a failed paste can never lose the text.
+        if !text.is_empty() {
+            if let Ok(mut latest) = self.transcript.lock() {
+                *latest = Some(text.clone());
+            }
+        }
         paste_text(&mut self.clipboard, &mut self.keyboard, self.config.hotkey, &text, &*self.sleep)?;
         Ok(())
     }

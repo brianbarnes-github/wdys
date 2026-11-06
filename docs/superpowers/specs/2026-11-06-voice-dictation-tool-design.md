@@ -104,6 +104,10 @@ checksum-verified.
   incremental pasting, no chunking in v1).
 - **Latency/memory:** model stays loaded for a default idle timeout of
   10 minutes, then unloads. Target hardware: an ordinary modern laptop CPU.
+- **Paste failure never loses text (added at the user's request):** if the paste cannot
+  be completed (hotkey still held, input blocked), the dictated text is left on the clipboard
+  as a normal entry and a toast says so. The latest transcript is also kept in memory only
+  (never written to disk) and the tray offers "Copy last transcript". Only the last one is kept.
 - **Clipboard:** v1 saves and restores text content only; non-text clipboard
   contents (images, files) are not preserved and this is a known limitation.
   The dictated text is marked to be excluded from Windows clipboard history.

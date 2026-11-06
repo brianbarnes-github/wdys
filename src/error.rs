@@ -47,6 +47,8 @@ pub enum PasteError {
     Input(String),
     #[error("hotkey is still held")]
     HotkeyStillHeld,
+    #[error("paste failed ({0}); your text is on the clipboard, press Ctrl+V to paste it")]
+    TextOnClipboard(String),
 }
 
 #[derive(Debug, thiserror::Error)]

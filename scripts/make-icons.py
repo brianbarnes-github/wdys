@@ -4,6 +4,7 @@
 Outputs (committed, so the Rust build needs no image tooling):
   resources/wdys.ico       multi-size icon embedded in wdys.exe
   resources/tray-32.rgba   raw 32x32 RGBA bytes used for the tray icon
+  resources/wdys-256.png   256px icon shown on toast notifications
 Requires Pillow.  usage: python3 scripts/make-icons.py
 """
 from pathlib import Path
@@ -48,6 +49,7 @@ def main() -> None:
     master = transparent_tile(Image.open(SRC).convert("RGB"))
     print(f"tile {master.size[0]}x{master.size[1]}")
     master.save(ROOT / "resources" / "wdys.ico", sizes=[(s, s) for s in SIZES])
+    master.resize((256, 256), Image.LANCZOS).save(ROOT / "resources" / "wdys-256.png", optimize=True)
     (ROOT / "resources" / "tray-32.rgba").write_bytes(master.resize((32, 32), Image.LANCZOS).tobytes())
 
 

@@ -12,3 +12,5 @@ pub mod app;
 #[cfg(windows)]
 pub mod platform;
 pub mod icon;
+pub mod keys;
+pub mod toast;

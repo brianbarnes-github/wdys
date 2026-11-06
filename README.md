@@ -44,7 +44,7 @@ yellow error, none when ready). Both outputs are committed, so building needs no
 - [ ] Text that was on the clipboard before dictating is back on the clipboard afterwards.
 - [ ] Double-press starts hands-free (tray icon turns orange); one more press stops and pastes.
 - [ ] A quick tap does nothing.
-- [ ] Tray > "Set hotkey...", press F9: F9 now works, and it still works after restarting wdys.
+- [ ] Tray > "Set hotkey...": a "Select your key" toast appears; press a key and a "Hotkey set" toast names it. The new key works, and still does after restarting wdys.
 - [ ] A second launch is refused with a message.
 - [ ] Unplugging the microphone mid-recording shows a notice in the tray tooltip and wdys recovers.
 - [ ] Idle for 10+ minutes: Task Manager shows ~0% CPU and memory drops (model unloaded).

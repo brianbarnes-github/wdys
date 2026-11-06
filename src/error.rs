@@ -79,6 +79,8 @@ pub enum PlatformError {
     Registry(String),
     #[error("tray error: {0}")]
     Tray(String),
+    #[error("notification error: {0}")]
+    Toast(String),
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
 }

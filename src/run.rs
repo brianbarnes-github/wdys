@@ -19,6 +19,7 @@ use wdys::app::{run_worker, App, Cue, UiEvent};
 use wdys::config::{self, Config, ModelSize, VirtualKey};
 use wdys::error::InstanceError;
 use wdys::hotkey::{Input, Millis};
+use wdys::keys::key_name;
 use wdys::model_store::{ensure_model, model_path, model_sha256, Consent, UreqDownloader};
 use wdys::platform::autostart;
 use wdys::platform::clipboard::WinClipboard;
@@ -27,6 +28,7 @@ use wdys::platform::hook::{capture_next_key, install_hook, spawn_ticker, KeyTrac
 use wdys::platform::instance;
 use wdys::platform::keyboard::WinKeyboard;
 use wdys::platform::recorder::CpalRecorder;
+use wdys::platform::toast::Toaster;
 use wdys::platform::tray::{MenuAction, TrayUi};
 use wdys::transcribe::{LazyModel, ModelLoader};
 
@@ -39,6 +41,7 @@ enum MainMsg {
     Info(String),
     Menu(MenuId),
     HotkeyChosen(VirtualKey),
+    HotkeyCaptureFailed,
 }
 
 /// Posts to the main thread so it wakes from `GetMessageW` and drains its channel.
@@ -137,6 +140,13 @@ fn spawn_worker(
     });
 }
 
+/// Shows a toast; if toasts are unavailable, falls back to the tray tooltip.
+fn announce(toaster: Option<&Toaster>, tray: &TrayUi, title: &str, body: &str) {
+    if toaster.is_none_or(|t| t.show(title, body).is_err()) {
+        tray.show_info(&format!("wdys: {title}. {body}"));
+    }
+}
+
 fn save_config(path: &Path, config: &Config, mailbox: &Mailbox) {
     if let Err(e) = config::save(path, config) {
         mailbox.send(MainMsg::Info(format!("Could not save settings: {e}")));
@@ -186,10 +196,12 @@ pub fn main() {
         }
     };
     let menu_mailbox = mailbox.clone();
+    let toaster = Toaster::new(&dir).ok();
     MenuEvent::set_event_handler(Some(move |event: MenuEvent| menu_mailbox.send(MainMsg::Menu(event.id))));
 
     spawn_worker(config.clone(), dir.join("models"), tracker.clone(), input_rx, mailbox.clone());
 
+    let mut capturing = false;
     let mut msg = MSG::default();
     // SAFETY: standard Win32 message loop on the thread that owns the tray icon.
     while unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
@@ -202,21 +214,38 @@ pub fn main() {
                 MainMsg::Ui(event) => tray.apply(&event),
                 MainMsg::Info(text) => tray.show_info(&text),
                 MainMsg::HotkeyChosen(key) => {
+                    capturing = false;
                     tracker.set_hotkey(key);
                     config.hotkey = key;
                     save_config(&config_path, &config, &mailbox);
-                    tray.show_info(&format!("wdys: hotkey set (key code 0x{:X})", key.0));
+                    announce(
+                        toaster.as_ref(),
+                        &tray,
+                        "Hotkey set",
+                        &format!("Hold {} to dictate. Double-press it for hands-free.", key_name(key.0)),
+                    );
+                }
+                MainMsg::HotkeyCaptureFailed => {
+                    capturing = false;
+                    announce(toaster.as_ref(), &tray, "Hotkey unchanged", "No key was pressed.");
                 }
                 MainMsg::Menu(id) => match tray.action_for(&id) {
                     Some(MenuAction::Quit) => return,
-                    Some(MenuAction::SetHotkey) => {
-                        tray.show_info("wdys: press the new hotkey now...");
+                    Some(MenuAction::SetHotkey) if !capturing => {
+                        capturing = true;
+                        announce(
+                            toaster.as_ref(),
+                            &tray,
+                            "Select your key",
+                            "Press the key you want to use as your hotkey.",
+                        );
                         let (tracker, mailbox) = (tracker.clone(), mailbox.clone());
                         thread::spawn(move || match capture_next_key(&tracker, HOTKEY_CAPTURE_TIMEOUT) {
                             Ok(key) => mailbox.send(MainMsg::HotkeyChosen(key)),
-                            Err(e) => mailbox.send(MainMsg::Info(format!("wdys: {e}"))),
+                            Err(_) => mailbox.send(MainMsg::HotkeyCaptureFailed),
                         });
                     }
+                    Some(MenuAction::SetHotkey) => {}
                     Some(MenuAction::UseModel(size)) => {
                         config.model = size;
                         tray.show_model(size);

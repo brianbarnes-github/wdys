@@ -11,6 +11,10 @@ pub struct AudioClip {
 pub trait Recorder {
     fn start(&mut self) -> Result<(), AudioError>;
     fn stop(&mut self) -> Result<AudioClip, AudioError>;
+    /// True once the input device has been lost mid-recording.
+    fn is_lost(&self) -> bool {
+        false
+    }
 }
 
 const SILENCE_RMS_THRESHOLD: f32 = 0.003;

@@ -123,3 +123,18 @@ fn synthesizes_keyup_only_when_believed_down_but_actually_up() {
     assert!(!should_synthesize_keyup(false, false));
     assert!(!should_synthesize_keyup(false, true));
 }
+
+#[test]
+fn tick_timestamped_before_keydown_does_not_stop() {
+    // The ticker and the hook run on different threads, so a Tick can carry a timestamp
+    // a hair older than a KeyDown that was already enqueued.
+    let (state, actions) = step(&CFG, State::Holding { since: 1001 }, Tick, 1000);
+    assert_eq!(actions, vec![]);
+    assert_eq!(state, State::Holding { since: 1001 });
+}
+
+#[test]
+fn keyup_timestamped_before_keydown_is_a_tap_not_a_panic() {
+    let (_, actions) = step(&CFG, State::Holding { since: 1001 }, KeyUp, 1000);
+    assert_eq!(actions, vec![CancelRecording]);
+}

@@ -54,25 +54,25 @@ pub fn step(cfg: &FsmConfig, state: State, input: Input, now: Millis) -> (State,
         (Idle, KeyDown) => (Holding { since: now }, vec![StartRecording]),
         (Idle, _) => (Idle, vec![]),
 
-        (Holding { since }, KeyUp) if now - since >= cfg.min_hold => (Idle, vec![StopAndTranscribe]),
+        (Holding { since }, KeyUp) if now.saturating_sub(since) >= cfg.min_hold => (Idle, vec![StopAndTranscribe]),
         (Holding { .. }, KeyUp) => (AwaitingSecondTap { released_at: now }, vec![CancelRecording]),
-        (Holding { since }, Tick) if now - since >= cfg.max_recording => {
+        (Holding { since }, Tick) if now.saturating_sub(since) >= cfg.max_recording => {
             (WaitingRelease, vec![StopAndTranscribe])
         }
         (Holding { since }, _) => (Holding { since }, vec![]),
 
-        (AwaitingSecondTap { released_at }, KeyDown) if now - released_at < cfg.double_press_window => {
+        (AwaitingSecondTap { released_at }, KeyDown) if now.saturating_sub(released_at) < cfg.double_press_window => {
             (HandsFree { since: now, key_held: true }, vec![StartRecording, EnterHandsFree])
         }
         (AwaitingSecondTap { .. }, KeyDown) => (Holding { since: now }, vec![StartRecording]),
-        (AwaitingSecondTap { released_at }, Tick) if now - released_at >= cfg.double_press_window => {
+        (AwaitingSecondTap { released_at }, Tick) if now.saturating_sub(released_at) >= cfg.double_press_window => {
             (Idle, vec![])
         }
         (AwaitingSecondTap { released_at }, _) => (AwaitingSecondTap { released_at }, vec![]),
 
         (HandsFree { since, .. }, KeyUp) => (HandsFree { since, key_held: false }, vec![]),
         (HandsFree { key_held: false, .. }, KeyDown) => (WaitingRelease, vec![StopAndTranscribe]),
-        (HandsFree { since, key_held }, Tick) if now - since >= cfg.max_recording => {
+        (HandsFree { since, key_held }, Tick) if now.saturating_sub(since) >= cfg.max_recording => {
             (if key_held { WaitingRelease } else { Idle }, vec![StopAndTranscribe])
         }
         (HandsFree { since, key_held }, _) => (HandsFree { since, key_held }, vec![]),

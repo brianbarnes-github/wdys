@@ -31,6 +31,7 @@ struct RecLog {
     silent: bool,
     fail_next_start: bool,
     fail_next_stop: bool,
+    lost: bool,
 }
 
 struct FakeRecorder(Shared<RecLog>);
@@ -44,10 +45,13 @@ impl Recorder for FakeRecorder {
         log.starts += 1;
         Ok(())
     }
+    fn is_lost(&self) -> bool {
+        self.0.borrow().lost
+    }
     fn stop(&mut self) -> Result<AudioClip, AudioError> {
         let mut log = self.0.borrow_mut();
         log.stops += 1;
-        if std::mem::take(&mut log.fail_next_stop) {
+        if std::mem::take(&mut log.fail_next_stop) || log.lost {
             return Err(AudioError::DeviceLost);
         }
         Ok(if log.silent { AudioClip { samples: vec![0.0; 16_000] } } else { tone(1.0) })
@@ -290,4 +294,46 @@ fn idle_tick_unloads_model_and_next_use_reloads_it() {
     play(&mut r, &[(Tick, 1_000 + 600_000)]);
     play(&mut r, &[(KeyDown, 700_000), (KeyUp, 701_000)]);
     assert_eq!(r.loads.get(), 2);
+}
+
+#[test]
+fn device_lost_mid_recording_ends_the_recording_on_the_next_tick() {
+    let mut r = rig("hello");
+    play(&mut r, &[(KeyDown, 0)]);
+    r.rec.borrow_mut().lost = true;
+    let events = play(&mut r, &[(Tick, 200)]);
+    assert!(events.iter().any(|e| matches!(e, UiEvent::Notify(_))));
+    assert_eq!(r.rec.borrow().stops, 1);
+    assert!(r.pasted.borrow().is_empty());
+    assert_eq!(events.last(), Some(&UiEvent::Tray(TrayState::Idle)));
+    // the key is still physically held; its release must not start anything
+    play(&mut r, &[(KeyUp, 300)]);
+    assert_eq!(r.app.state(), State::Idle);
+    assert_eq!(r.rec.borrow().starts, 1);
+}
+
+#[test]
+fn device_lost_during_hands_free_ends_the_recording_too() {
+    let mut r = rig("hello");
+    play(&mut r, &[(KeyDown, 0), (KeyUp, 100), (KeyDown, 300), (KeyUp, 400)]);
+    r.rec.borrow_mut().lost = true;
+    let events = play(&mut r, &[(Tick, 500)]);
+    assert!(events.iter().any(|e| matches!(e, UiEvent::Notify(_))));
+    assert_eq!(r.app.state(), State::Idle);
+}
+
+#[test]
+fn errors_make_an_audible_error_cue() {
+    let mut r = rig("hello");
+    r.rec.borrow_mut().fail_next_start = true;
+    let events = play(&mut r, &[(KeyDown, 0)]);
+    assert!(events.contains(&UiEvent::Cue(Cue::Error)));
+}
+
+#[test]
+fn error_cue_respects_the_sounds_setting() {
+    let mut r = rig_with("hello", Config { sounds: false, ..Config::default() }, None);
+    r.rec.borrow_mut().fail_next_start = true;
+    let events = play(&mut r, &[(KeyDown, 0)]);
+    assert!(!events.iter().any(|e| matches!(e, UiEvent::Cue(_))));
 }

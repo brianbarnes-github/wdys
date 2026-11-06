@@ -21,6 +21,7 @@ pub enum TrayState {
 pub enum Cue {
     Start,
     Stop,
+    Error,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,6 +70,10 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
         if input == Input::Tick {
             self.model.unload_if_idle(now);
         }
+        if input == Input::Tick && self.recording_device_lost() {
+            self.end_after_device_loss(now, emit);
+            return;
+        }
         let (next, actions) = step(&self.fsm, self.state, input, now);
         self.state = next;
         for action in actions {
@@ -76,6 +81,23 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
                 break;
             }
         }
+    }
+
+    fn recording_device_lost(&self) -> bool {
+        matches!(self.state, State::Holding { .. } | State::HandsFree { .. }) && self.recorder.is_lost()
+    }
+
+    /// The microphone vanished mid-recording: stop now (surfacing the error) instead of
+    /// letting the user keep talking into nothing. A still-held key must not restart anything.
+    fn end_after_device_loss(&mut self, now: Millis, emit: &mut dyn FnMut(UiEvent)) {
+        let key_held = matches!(self.state, State::Holding { .. } | State::HandsFree { key_held: true, .. });
+        self.state = if key_held { State::WaitingRelease } else { State::Idle };
+        self.perform(Action::StopAndTranscribe, now, emit);
+    }
+
+    fn notify(&self, message: String, emit: &mut dyn FnMut(UiEvent)) {
+        emit(UiEvent::Notify(message));
+        self.cue(Cue::Error, emit);
     }
 
     fn cue(&self, cue: Cue, emit: &mut dyn FnMut(UiEvent)) {
@@ -95,7 +117,7 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
                 }
                 Err(e) => {
                     self.state = State::Idle;
-                    emit(UiEvent::Notify(e.to_string()));
+                    self.notify(e.to_string(), emit);
                     emit(UiEvent::Tray(TrayState::Idle));
                     false
                 }
@@ -113,7 +135,7 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
                 self.cue(Cue::Stop, emit);
                 emit(UiEvent::Tray(TrayState::Transcribing));
                 if let Err(e) = self.finish_recording(now) {
-                    emit(UiEvent::Notify(e.to_string()));
+                    self.notify(e.to_string(), emit);
                 }
                 emit(UiEvent::Tray(TrayState::Idle));
                 true

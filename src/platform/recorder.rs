@@ -67,6 +67,10 @@ impl Recorder for CpalRecorder {
         Ok(())
     }
 
+    fn is_lost(&self) -> bool {
+        self.capture.is_some() && self.lost.load(Ordering::Relaxed)
+    }
+
     fn stop(&mut self) -> Result<AudioClip, AudioError> {
         let capture = self.capture.take().ok_or_else(|| AudioError::Stream("not recording".into()))?;
         drop(capture.stream);

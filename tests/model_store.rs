@@ -136,3 +136,23 @@ fn downloader_failure_leaves_no_files() {
     assert!(matches!(result, Err(ModelError::Download(_))));
     assert!(file_names(dir.path()).is_empty());
 }
+
+#[test]
+fn mismatched_existing_model_is_kept_when_download_is_declined() {
+    let dir = tempfile::tempdir().unwrap();
+    let existing = model_path(dir.path(), ModelSize::BaseEn);
+    fs::write(&existing, b"user placed this by hand").unwrap();
+    let result = ensure_model(dir.path(), ModelSize::BaseEn, &FakeDownloader::new(GOOD), &FakeConsent::new(false), GOOD_SHA);
+    assert!(matches!(result, Err(ModelError::DownloadDeclined)));
+    assert_eq!(fs::read(&existing).unwrap(), b"user placed this by hand");
+}
+
+#[test]
+fn mismatched_existing_model_is_kept_when_download_fails_verification() {
+    let dir = tempfile::tempdir().unwrap();
+    let existing = model_path(dir.path(), ModelSize::BaseEn);
+    fs::write(&existing, b"user placed this by hand").unwrap();
+    let result = ensure_model(dir.path(), ModelSize::BaseEn, &FakeDownloader::new(b"tampered"), &FakeConsent::new(true), GOOD_SHA);
+    assert!(matches!(result, Err(ModelError::ChecksumMismatch { .. })));
+    assert_eq!(fs::read(&existing).unwrap(), b"user placed this by hand");
+}

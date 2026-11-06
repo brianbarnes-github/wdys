@@ -74,7 +74,9 @@ fn part_path(final_path: &Path) -> PathBuf {
 }
 
 /// Returns the path to a verified model, downloading it (after consent) if needed.
-/// A corrupt existing file is treated as missing; a bad download never reaches the final path.
+/// A mismatched existing file is treated as missing but is only replaced (by rename) once a
+/// verified download exists, so a hand-placed file is never destroyed; a bad download never
+/// reaches the final path.
 pub fn ensure_model(
     dir: &Path,
     size: ModelSize,
@@ -83,11 +85,8 @@ pub fn ensure_model(
     expected_sha256: &str,
 ) -> Result<PathBuf, ModelError> {
     let final_path = model_path(dir, size);
-    if final_path.exists() {
-        if verify_checksum(&final_path, expected_sha256).is_ok() {
-            return Ok(final_path);
-        }
-        fs::remove_file(&final_path)?;
+    if final_path.exists() && verify_checksum(&final_path, expected_sha256).is_ok() {
+        return Ok(final_path);
     }
     if !consent.allow_download(size, model_approx_bytes(size)) {
         return Err(ModelError::DownloadDeclined);

@@ -112,6 +112,9 @@ fn spawn_worker(
         let path = ensure_model(&models_dir, config.model, &UreqDownloader, &DialogConsent, model_sha256(config.model))
             .unwrap_or_else(|e| {
                 mailbox.send(MainMsg::Ui(UiEvent::Notify(format!("Speech model unavailable: {e}"))));
+                if config.sounds {
+                    play_cue(Cue::Error);
+                }
                 model_path(&models_dir, config.model)
             });
         let idle = Millis::from(config.idle_unload_secs) * 1000;
@@ -125,7 +128,7 @@ fn spawn_worker(
             Box::new(thread::sleep),
         );
         run_worker(rx, &mut app, &|event| match event {
-            UiEvent::Cue(cue @ (Cue::Start | Cue::Stop)) => play_cue(cue),
+            UiEvent::Cue(cue) => play_cue(cue),
             other => mailbox.send(MainMsg::Ui(other)),
         });
     });

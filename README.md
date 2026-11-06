@@ -42,7 +42,7 @@ yellow error, none when ready). Both outputs are committed, so building needs no
 - [ ] Hold F9, speak, release: text appears in Notepad and in a browser text box, and no F9 keypress reaches the app (e.g. F9 does nothing in a browser).
 - [ ] "um" and "uh" are gone from the pasted text.
 - [ ] Text that was on the clipboard before dictating is back on the clipboard afterwards.
-- [ ] Double-press starts hands-free (tray icon turns orange); one more press stops and pastes.
+- [ ] Double-press starts hands-free: a small pill with a pulsing red dot and the mic icon appears at the top centre of the screen (and the tray dot turns orange); one more press hides it, stops, and pastes.
 - [ ] A quick tap does nothing.
 - [ ] Tray > "Set hotkey...": a "Select your key" toast appears; press a key and a "Hotkey set" toast names it. The new key works, and still does after restarting wdys.
 - [ ] A second launch is refused with a message.

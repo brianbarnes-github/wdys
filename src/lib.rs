@@ -14,3 +14,4 @@ pub mod platform;
 pub mod icon;
 pub mod keys;
 pub mod toast;
+pub mod overlay;

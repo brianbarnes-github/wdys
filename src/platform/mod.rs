@@ -9,3 +9,4 @@ pub mod autostart;
 pub mod instance;
 pub mod tray;
 pub mod toast;
+pub mod overlay;

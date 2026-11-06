@@ -12,7 +12,7 @@ use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, GetMessageW, MessageBoxW, PostThreadMessageW, TranslateMessage, IDYES, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_OK, MB_TOPMOST, MB_YESNO, MSG, WM_APP,
+    MB_ICONQUESTION, MB_OK, MB_TOPMOST, MB_YESNO, MSG, WM_APP, WM_TIMER,
 };
 
 use wdys::app::{run_worker, App, Cue, UiEvent};
@@ -28,6 +28,7 @@ use wdys::platform::hook::{capture_next_key, install_hook, spawn_ticker, KeyTrac
 use wdys::platform::instance;
 use wdys::platform::keyboard::WinKeyboard;
 use wdys::platform::recorder::CpalRecorder;
+use wdys::platform::overlay::Overlay;
 use wdys::platform::toast::Toaster;
 use wdys::platform::tray::{MenuAction, TrayUi};
 use wdys::transcribe::{LazyModel, ModelLoader};
@@ -197,6 +198,7 @@ pub fn main() {
     };
     let menu_mailbox = mailbox.clone();
     let toaster = Toaster::new(&dir).ok();
+    let mut overlay = Overlay::new().ok();
     MenuEvent::set_event_handler(Some(move |event: MenuEvent| menu_mailbox.send(MainMsg::Menu(event.id))));
 
     spawn_worker(config.clone(), dir.join("models"), tracker.clone(), input_rx, mailbox.clone());
@@ -205,13 +207,24 @@ pub fn main() {
     let mut msg = MSG::default();
     // SAFETY: standard Win32 message loop on the thread that owns the tray icon.
     while unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
+        if msg.message == WM_TIMER {
+            if let Some(overlay) = overlay.as_mut().filter(|o| o.owns_timer(msg.wParam.0)) {
+                overlay.pulse();
+                continue;
+            }
+        }
         unsafe {
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
         while let Ok(message) = main_rx.try_recv() {
             match message {
-                MainMsg::Ui(event) => tray.apply(&event),
+                MainMsg::Ui(event) => {
+                    tray.apply(&event);
+                    if let Some(overlay) = overlay.as_mut() {
+                        overlay.apply(&event);
+                    }
+                }
                 MainMsg::Info(text) => tray.show_info(&text),
                 MainMsg::HotkeyChosen(key) => {
                     capturing = false;

@@ -20,7 +20,9 @@ type Wake = (Input, Millis);
 fn tone(seconds: f32) -> AudioClip {
     let n = (16_000.0 * seconds) as usize;
     AudioClip {
-        samples: (0..n).map(|i| 0.5 * (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 16_000.0).sin()).collect(),
+        samples: (0..n)
+            .map(|i| 0.5 * (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 16_000.0).sin())
+            .collect(),
     }
 }
 
@@ -54,7 +56,13 @@ impl Recorder for FakeRecorder {
         if std::mem::take(&mut log.fail_next_stop) || log.lost {
             return Err(AudioError::DeviceLost);
         }
-        Ok(if log.silent { AudioClip { samples: vec![0.0; 16_000] } } else { tone(1.0) })
+        Ok(if log.silent {
+            AudioClip {
+                samples: vec![0.0; 16_000],
+            }
+        } else {
+            tone(1.0)
+        })
     }
 }
 
@@ -124,7 +132,9 @@ impl Keyboard for FakeKeyboard {
         if self.fail_paste.get() {
             return Err(PasteError::Input("blocked".into()));
         }
-        self.pasted.borrow_mut().push(self.content.borrow().clone().unwrap_or_default());
+        self.pasted
+            .borrow_mut()
+            .push(self.content.borrow().clone().unwrap_or_default());
         Ok(())
     }
     fn is_down(&self, _key: VirtualKey) -> bool {
@@ -148,7 +158,10 @@ fn rig_with(transcript: &str, config: Config, extra: Option<Sender<Wake>>) -> Ri
     let rec = Rc::new(RefCell::new(RecLog::default()));
     let (loads, model_calls) = (Rc::new(Cell::new(0)), Rc::new(Cell::new(0)));
     let content = Rc::new(RefCell::new(Some("previous".to_string())));
-    let (writes, pasted) = (Rc::new(RefCell::new(Vec::new())), Rc::new(RefCell::new(Vec::new())));
+    let (writes, pasted) = (
+        Rc::new(RefCell::new(Vec::new())),
+        Rc::new(RefCell::new(Vec::new())),
+    );
     let loader = FakeLoader {
         text: transcript.to_string(),
         loads: loads.clone(),
@@ -163,12 +176,29 @@ fn rig_with(transcript: &str, config: Config, extra: Option<Sender<Wake>>) -> Ri
         config,
         FakeRecorder(rec.clone()),
         model,
-        FakeClipboard { content: content.clone(), writes: writes.clone() },
-        FakeKeyboard { content: content.clone(), pasted: pasted.clone(), fail_paste: fail_paste.clone() },
+        FakeClipboard {
+            content: content.clone(),
+            writes: writes.clone(),
+        },
+        FakeKeyboard {
+            content: content.clone(),
+            pasted: pasted.clone(),
+            fail_paste: fail_paste.clone(),
+        },
         Box::new(|_: Duration| {}),
     )
     .with_transcript_store(store.clone());
-    Rig { app, rec, loads, model_calls, content, writes, pasted, store, fail_paste }
+    Rig {
+        app,
+        rec,
+        loads,
+        model_calls,
+        content,
+        writes,
+        pasted,
+        store,
+        fail_paste,
+    }
 }
 
 fn rig(transcript: &str) -> Rig {
@@ -195,7 +225,10 @@ fn hold_speak_release_pastes_cleaned_text() {
 #[test]
 fn double_press_hands_free_pastes_on_next_press() {
     let mut r = rig("hello");
-    play(&mut r, &[(KeyDown, 0), (KeyUp, 100), (KeyDown, 300), (KeyUp, 400)]);
+    play(
+        &mut r,
+        &[(KeyDown, 0), (KeyUp, 100), (KeyDown, 300), (KeyUp, 400)],
+    );
     assert!(r.pasted.borrow().is_empty());
     play(&mut r, &[(KeyDown, 5_000)]);
     assert_eq!(*r.pasted.borrow(), vec!["hello".to_string()]);
@@ -245,7 +278,11 @@ fn input_during_transcription_is_dropped() {
     drop(tx);
     let events = RefCell::new(Vec::new());
     run_worker(rx, &mut r.app, &|e| events.borrow_mut().push(e));
-    assert_eq!(r.rec.borrow().starts, 1, "queued key events must not start a second recording");
+    assert_eq!(
+        r.rec.borrow().starts,
+        1,
+        "queued key events must not start a second recording"
+    );
     assert_eq!(r.app.state(), State::Idle);
     assert_eq!(*r.pasted.borrow(), vec!["hello".to_string()]);
 }
@@ -275,8 +312,24 @@ fn recorder_stop_failure_notifies_and_pastes_nothing() {
 fn tray_states_progress_idle_recording_transcribing_idle() {
     let mut r = rig("hello");
     let events = play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
-    let tray: Vec<_> = events.iter().filter_map(|e| if let UiEvent::Tray(t) = e { Some(*t) } else { None }).collect();
-    assert_eq!(tray, vec![TrayState::Recording, TrayState::Transcribing, TrayState::Idle]);
+    let tray: Vec<_> = events
+        .iter()
+        .filter_map(|e| {
+            if let UiEvent::Tray(t) = e {
+                Some(*t)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        tray,
+        vec![
+            TrayState::Recording,
+            TrayState::Transcribing,
+            TrayState::Idle
+        ]
+    );
     assert!(events.contains(&UiEvent::Cue(Cue::Start)));
     assert!(events.contains(&UiEvent::Cue(Cue::Stop)));
 }
@@ -290,7 +343,14 @@ fn hands_free_entry_shows_hands_free_tray_state() {
 
 #[test]
 fn sounds_off_emits_no_cues() {
-    let mut r = rig_with("hello", Config { sounds: false, ..Config::default() }, None);
+    let mut r = rig_with(
+        "hello",
+        Config {
+            sounds: false,
+            ..Config::default()
+        },
+        None,
+    );
     let events = play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
     assert!(!events.iter().any(|e| matches!(e, UiEvent::Cue(_))));
 }
@@ -324,7 +384,10 @@ fn device_lost_mid_recording_ends_the_recording_on_the_next_tick() {
 #[test]
 fn device_lost_during_hands_free_ends_the_recording_too() {
     let mut r = rig("hello");
-    play(&mut r, &[(KeyDown, 0), (KeyUp, 100), (KeyDown, 300), (KeyUp, 400)]);
+    play(
+        &mut r,
+        &[(KeyDown, 0), (KeyUp, 100), (KeyDown, 300), (KeyUp, 400)],
+    );
     r.rec.borrow_mut().lost = true;
     let events = play(&mut r, &[(Tick, 500)]);
     assert!(events.iter().any(|e| matches!(e, UiEvent::Notify(_))));
@@ -341,7 +404,14 @@ fn errors_make_an_audible_error_cue() {
 
 #[test]
 fn error_cue_respects_the_sounds_setting() {
-    let mut r = rig_with("hello", Config { sounds: false, ..Config::default() }, None);
+    let mut r = rig_with(
+        "hello",
+        Config {
+            sounds: false,
+            ..Config::default()
+        },
+        None,
+    );
     r.rec.borrow_mut().fail_next_start = true;
     let events = play(&mut r, &[(KeyDown, 0)]);
     assert!(!events.iter().any(|e| matches!(e, UiEvent::Cue(_))));
@@ -365,7 +435,9 @@ fn a_failed_paste_keeps_the_text_on_the_clipboard_and_remembered_and_says_so() {
     let events = play(&mut r, &[(KeyDown, 0), (KeyUp, 1_000)]);
     assert_eq!(*r.content.borrow(), Some("hello".to_string()));
     assert_eq!(remembered(&r), Some("hello".to_string()));
-    assert!(events.iter().any(|e| matches!(e, UiEvent::Notify(m) if m.contains("clipboard"))));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, UiEvent::Notify(m) if m.contains("clipboard"))));
 }
 
 #[test]

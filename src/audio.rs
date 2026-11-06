@@ -49,7 +49,13 @@ fn resample(mono: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
 
 /// Converts interleaved device samples to 16 kHz mono.
 pub fn to_whisper_input(samples: &[f32], sample_rate: u32, channels: u16) -> AudioClip {
-    AudioClip { samples: resample(&downmix(samples, channels), sample_rate, WHISPER_SAMPLE_RATE) }
+    AudioClip {
+        samples: resample(
+            &downmix(samples, channels),
+            sample_rate,
+            WHISPER_SAMPLE_RATE,
+        ),
+    }
 }
 
 /// True for clips too short to hold speech or too quiet to contain any.

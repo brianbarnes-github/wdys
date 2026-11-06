@@ -46,7 +46,9 @@ impl Keyboard for FakeKeyboard {
         if self.fail_paste {
             return Err(PasteError::Input("boom".into()));
         }
-        self.pasted.borrow_mut().push(self.clipboard.borrow().clone());
+        self.pasted
+            .borrow_mut()
+            .push(self.clipboard.borrow().clone());
         Ok(())
     }
     fn is_down(&self, _key: VirtualKey) -> bool {
@@ -72,7 +74,11 @@ fn rig_with(initial: Option<&str>, down_polls: u32, fail_paste: bool, fail_set: 
     let writes = Rc::new(RefCell::new(Vec::new()));
     let pasted = Rc::new(RefCell::new(Vec::new()));
     Rig {
-        clipboard: FakeClipboard { content: content.clone(), writes: writes.clone(), fail_set },
+        clipboard: FakeClipboard {
+            content: content.clone(),
+            writes: writes.clone(),
+            fail_set,
+        },
         keyboard: FakeKeyboard {
             clipboard: content.clone(),
             pasted: pasted.clone(),
@@ -94,7 +100,14 @@ fn no_sleep(_: Duration) {}
 #[test]
 fn pastes_and_restores_previous_text() {
     let mut r = rig(Some("previous"), 0, false);
-    paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hello", &no_sleep).unwrap();
+    paste_text(
+        &mut r.clipboard,
+        &mut r.keyboard,
+        HOTKEY,
+        "hello",
+        &no_sleep,
+    )
+    .unwrap();
     assert_eq!(*r.pasted.borrow(), vec![Some("hello".to_string())]);
     assert_eq!(*r.content.borrow(), Some("previous".to_string()));
     assert_eq!(r.writes.borrow()[0], ("hello".to_string(), true));
@@ -112,7 +125,14 @@ fn empty_text_touches_nothing() {
 #[test]
 fn empty_clipboard_is_cleared_afterward() {
     let mut r = rig(None, 0, false);
-    paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hello", &no_sleep).unwrap();
+    paste_text(
+        &mut r.clipboard,
+        &mut r.keyboard,
+        HOTKEY,
+        "hello",
+        &no_sleep,
+    )
+    .unwrap();
     assert_eq!(*r.pasted.borrow(), vec![Some("hello".to_string())]);
     assert_eq!(*r.content.borrow(), None);
 }
@@ -121,7 +141,10 @@ fn empty_clipboard_is_cleared_afterward() {
 fn waits_for_hotkey_release() {
     let mut r = rig(None, 3, false);
     let sleeps = Cell::new(0u32);
-    paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hi", &|_| sleeps.set(sleeps.get() + 1)).unwrap();
+    paste_text(&mut r.clipboard, &mut r.keyboard, HOTKEY, "hi", &|_| {
+        sleeps.set(sleeps.get() + 1)
+    })
+    .unwrap();
     assert!(sleeps.get() >= 3);
     assert_eq!(r.pasted.borrow().len(), 1);
 }

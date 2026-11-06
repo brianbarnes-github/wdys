@@ -37,7 +37,10 @@ impl OpenGuard {
                 }
             }
         }
-        Err(err("could not open clipboard", last.map(|e| e.to_string()).unwrap_or_default()))
+        Err(err(
+            "could not open clipboard",
+            last.map(|e| e.to_string()).unwrap_or_default(),
+        ))
     }
 }
 
@@ -85,7 +88,8 @@ impl Clipboard for WinClipboard {
             if IsClipboardFormatAvailable(u32::from(CF_UNICODETEXT.0)).is_err() {
                 return Ok(None);
             }
-            let handle = GetClipboardData(u32::from(CF_UNICODETEXT.0)).map_err(|e| err("read failed", e))?;
+            let handle =
+                GetClipboardData(u32::from(CF_UNICODETEXT.0)).map_err(|e| err("read failed", e))?;
             let global = HGLOBAL(handle.0);
             let ptr = GlobalLock(global) as *const u16;
             if ptr.is_null() {

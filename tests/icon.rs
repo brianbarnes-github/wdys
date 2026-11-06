@@ -19,7 +19,10 @@ fn no_status_returns_the_base_icon_unchanged() {
 
 #[test]
 fn status_keeps_the_image_size() {
-    assert_eq!(with_status_dot(&base(), SIZE, Some([255, 0, 0])).len(), base().len());
+    assert_eq!(
+        with_status_dot(&base(), SIZE, Some([255, 0, 0])).len(),
+        base().len()
+    );
 }
 
 #[test]
@@ -43,5 +46,8 @@ fn rest_of_the_icon_is_untouched() {
 
 #[test]
 fn bundled_tray_artwork_is_a_32x32_rgba_image() {
-    assert_eq!(include_bytes!("../resources/tray-32.rgba").len(), (SIZE * SIZE * 4) as usize);
+    assert_eq!(
+        include_bytes!("../resources/tray-32.rgba").len(),
+        (SIZE * SIZE * 4) as usize
+    );
 }

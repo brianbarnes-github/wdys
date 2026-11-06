@@ -29,8 +29,12 @@ pub fn model_path(dir: &Path, size: ModelSize) -> PathBuf {
 
 pub fn model_url(size: ModelSize) -> &'static str {
     match size {
-        ModelSize::BaseEn => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
-        ModelSize::SmallEn => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin",
+        ModelSize::BaseEn => {
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+        }
+        ModelSize::SmallEn => {
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin"
+        }
     }
 }
 
@@ -63,7 +67,9 @@ pub fn verify_checksum(path: &Path, expected_hex: &str) -> Result<(), ModelError
     if format!("{:x}", hasher.finalize()).eq_ignore_ascii_case(expected_hex) {
         Ok(())
     } else {
-        Err(ModelError::ChecksumMismatch { path: path.to_path_buf() })
+        Err(ModelError::ChecksumMismatch {
+            path: path.to_path_buf(),
+        })
     }
 }
 
@@ -109,7 +115,9 @@ pub struct UreqDownloader;
 
 impl Downloader for UreqDownloader {
     fn fetch(&self, url: &str, dest: &Path) -> Result<(), ModelError> {
-        let response = ureq::get(url).call().map_err(|e| ModelError::Download(e.to_string()))?;
+        let response = ureq::get(url)
+            .call()
+            .map_err(|e| ModelError::Download(e.to_string()))?;
         let mut file = File::create(dest)?;
         io::copy(&mut response.into_reader(), &mut file)?;
         Ok(())

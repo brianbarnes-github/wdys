@@ -2,7 +2,8 @@
 
 use windows::core::w;
 use windows::Win32::System::Registry::{
-    RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_SZ,
+    RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
+    KEY_SET_VALUE, REG_SZ,
 };
 
 use crate::error::PlatformError;
@@ -20,7 +21,11 @@ pub fn set(enabled: bool) -> Result<(), PlatformError> {
         let result = if enabled {
             let exe = std::env::current_exe()?;
             let command = format!("\"{}\"", exe.display());
-            let bytes: Vec<u8> = command.encode_utf16().chain(std::iter::once(0)).flat_map(u16::to_le_bytes).collect();
+            let bytes: Vec<u8> = command
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .flat_map(u16::to_le_bytes)
+                .collect();
             RegSetValueExW(key, VALUE_NAME, None, REG_SZ, Some(&bytes)).ok()
         } else {
             // Deleting a value that does not exist is fine.

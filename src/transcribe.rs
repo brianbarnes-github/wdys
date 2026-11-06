@@ -22,8 +22,18 @@ pub struct LazyModel {
 }
 
 impl LazyModel {
-    pub fn new(loader: Box<dyn ModelLoader>, model_path: PathBuf, idle_unload: Millis) -> LazyModel {
-        LazyModel { loader, model_path, idle_unload, loaded: None, last_used: 0 }
+    pub fn new(
+        loader: Box<dyn ModelLoader>,
+        model_path: PathBuf,
+        idle_unload: Millis,
+    ) -> LazyModel {
+        LazyModel {
+            loader,
+            model_path,
+            idle_unload,
+            loaded: None,
+            last_used: 0,
+        }
     }
 
     pub fn transcribe(&mut self, clip: &AudioClip, now: Millis) -> Result<String, TranscribeError> {

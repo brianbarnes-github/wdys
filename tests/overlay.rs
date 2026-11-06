@@ -8,14 +8,22 @@ fn green_icon() -> Vec<u8> {
 
 fn px(frame: &OverlayFrame, x: u32, y: u32) -> [u8; 4] {
     let i = ((y * frame.width + x) * 4) as usize;
-    [frame.bgra[i], frame.bgra[i + 1], frame.bgra[i + 2], frame.bgra[i + 3]]
+    [
+        frame.bgra[i],
+        frame.bgra[i + 1],
+        frame.bgra[i + 2],
+        frame.bgra[i + 3],
+    ]
 }
 
 #[test]
 fn frame_has_the_documented_size() {
     let frame = overlay_frame(&green_icon(), ICON_SIZE, true);
     assert_eq!((frame.width, frame.height), (OVERLAY_WIDTH, OVERLAY_HEIGHT));
-    assert_eq!(frame.bgra.len(), (OVERLAY_WIDTH * OVERLAY_HEIGHT * 4) as usize);
+    assert_eq!(
+        frame.bgra.len(),
+        (OVERLAY_WIDTH * OVERLAY_HEIGHT * 4) as usize
+    );
 }
 
 #[test]

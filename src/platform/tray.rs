@@ -38,8 +38,12 @@ const BASE_ICON: &[u8] = include_bytes!("../../resources/tray-32.rgba");
 
 /// The artwork with a small status dot; `None` (ready) shows the plain artwork.
 fn icon(dot: Option<[u8; 3]>) -> Result<Icon, PlatformError> {
-    Icon::from_rgba(with_status_dot(BASE_ICON, ICON_SIZE, dot), ICON_SIZE, ICON_SIZE)
-        .map_err(|e| PlatformError::Tray(e.to_string()))
+    Icon::from_rgba(
+        with_status_dot(BASE_ICON, ICON_SIZE, dot),
+        ICON_SIZE,
+        ICON_SIZE,
+    )
+    .map_err(|e| PlatformError::Tray(e.to_string()))
 }
 
 fn state_dot(state: TrayState) -> Option<[u8; 3]> {
@@ -68,20 +72,34 @@ impl TrayUi {
         let menu = Menu::new();
         let set_hotkey = MenuItem::new("Set hotkey...", true, None);
         let copy_last = MenuItem::new("Copy last transcript", true, None);
-        let base = CheckMenuItem::new("Model: base (faster)", true, config.model == ModelSize::BaseEn, None);
-        let small = CheckMenuItem::new("Model: small (more accurate)", true, config.model == ModelSize::SmallEn, None);
-        let startup = CheckMenuItem::new("Start with Windows", true, config.start_with_windows, None);
+        let base = CheckMenuItem::new(
+            "Model: base (faster)",
+            true,
+            config.model == ModelSize::BaseEn,
+            None,
+        );
+        let small = CheckMenuItem::new(
+            "Model: small (more accurate)",
+            true,
+            config.model == ModelSize::SmallEn,
+            None,
+        );
+        let startup =
+            CheckMenuItem::new("Start with Windows", true, config.start_with_windows, None);
         let open_config = MenuItem::new("Open config file", true, None);
         let quit = MenuItem::new("Quit", true, None);
         menu.append(&set_hotkey).map_err(tray_err)?;
         menu.append(&copy_last).map_err(tray_err)?;
-        menu.append(&PredefinedMenuItem::separator()).map_err(tray_err)?;
+        menu.append(&PredefinedMenuItem::separator())
+            .map_err(tray_err)?;
         menu.append(&base).map_err(tray_err)?;
         menu.append(&small).map_err(tray_err)?;
-        menu.append(&PredefinedMenuItem::separator()).map_err(tray_err)?;
+        menu.append(&PredefinedMenuItem::separator())
+            .map_err(tray_err)?;
         menu.append(&startup).map_err(tray_err)?;
         menu.append(&open_config).map_err(tray_err)?;
-        menu.append(&PredefinedMenuItem::separator()).map_err(tray_err)?;
+        menu.append(&PredefinedMenuItem::separator())
+            .map_err(tray_err)?;
         menu.append(&quit).map_err(tray_err)?;
         let tray = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
@@ -89,7 +107,17 @@ impl TrayUi {
             .with_tooltip(state_label(TrayState::Idle))
             .build()
             .map_err(|e| PlatformError::Tray(e.to_string()))?;
-        Ok(TrayUi { tray, set_hotkey, copy_last, base, small, startup, open_config, quit, last_error: None })
+        Ok(TrayUi {
+            tray,
+            set_hotkey,
+            copy_last,
+            base,
+            small,
+            startup,
+            open_config,
+            quit,
+            last_error: None,
+        })
     }
 
     pub fn action_for(&self, id: &MenuId) -> Option<MenuAction> {
@@ -102,7 +130,10 @@ impl TrayUi {
             (self.open_config.id(), MenuAction::OpenConfig),
             (self.quit.id(), MenuAction::Quit),
         ];
-        table.into_iter().find(|(candidate, _)| *candidate == id).map(|(_, action)| action)
+        table
+            .into_iter()
+            .find(|(candidate, _)| *candidate == id)
+            .map(|(_, action)| action)
     }
 
     /// Whether the "Start with Windows" box is checked after the click that just happened.

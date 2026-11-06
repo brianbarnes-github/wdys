@@ -21,14 +21,20 @@ fn keeps_words_containing_fillers() {
 
 #[test]
 fn collapses_short_stutters() {
-    assert_eq!(clean_transcript("I I I want the the thing"), "I want the thing");
+    assert_eq!(
+        clean_transcript("I I I want the the thing"),
+        "I want the thing"
+    );
 }
 
 #[test]
 fn leaves_longer_repeats_alone() {
     // "that that" is legitimate English ("I know that that is true") and is 4 letters,
     // above the 3-letter stutter threshold. Emphatic "no, no" is also kept.
-    assert_eq!(clean_transcript("I know that that is true"), "I know that that is true");
+    assert_eq!(
+        clean_transcript("I know that that is true"),
+        "I know that that is true"
+    );
     assert_eq!(clean_transcript("no, no, wait"), "no, no, wait");
 }
 

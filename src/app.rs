@@ -104,14 +104,22 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
     }
 
     fn recording_device_lost(&self) -> bool {
-        matches!(self.state, State::Holding { .. } | State::HandsFree { .. }) && self.recorder.is_lost()
+        matches!(self.state, State::Holding { .. } | State::HandsFree { .. })
+            && self.recorder.is_lost()
     }
 
     /// The microphone vanished mid-recording: stop now (surfacing the error) instead of
     /// letting the user keep talking into nothing. A still-held key must not restart anything.
     fn end_after_device_loss(&mut self, now: Millis, emit: &mut dyn FnMut(UiEvent)) {
-        let key_held = matches!(self.state, State::Holding { .. } | State::HandsFree { key_held: true, .. });
-        self.state = if key_held { State::WaitingRelease } else { State::Idle };
+        let key_held = matches!(
+            self.state,
+            State::Holding { .. } | State::HandsFree { key_held: true, .. }
+        );
+        self.state = if key_held {
+            State::WaitingRelease
+        } else {
+            State::Idle
+        };
         self.perform(Action::StopAndTranscribe, now, emit);
     }
 
@@ -176,7 +184,13 @@ impl<R: Recorder, C: Clipboard, K: Keyboard> App<R, C, K> {
                 *latest = Some(text.clone());
             }
         }
-        paste_text(&mut self.clipboard, &mut self.keyboard, self.config.hotkey, &text, &*self.sleep)?;
+        paste_text(
+            &mut self.clipboard,
+            &mut self.keyboard,
+            self.config.hotkey,
+            &text,
+            &*self.sleep,
+        )?;
         Ok(())
     }
 }

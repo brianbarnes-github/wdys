@@ -28,6 +28,10 @@ pub fn preview(text: &str, max_chars: usize) -> String {
     if single_line.chars().count() <= max_chars {
         single_line
     } else {
-        single_line.chars().take(max_chars).chain(std::iter::once('\u{2026}')).collect()
+        single_line
+            .chars()
+            .take(max_chars)
+            .chain(std::iter::once('\u{2026}'))
+            .collect()
     }
 }

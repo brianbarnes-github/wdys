@@ -6,13 +6,13 @@ use std::path::{Path, PathBuf};
 
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::Data::Xml::Dom::XmlDocument;
-use windows::UI::Notifications::{ToastNotification, ToastNotificationManager, ToastNotifier};
 use windows::Win32::System::Registry::{
     RegCloseKey, RegCreateKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE,
     REG_OPTION_NON_VOLATILE, REG_SZ,
 };
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+use windows::UI::Notifications::{ToastNotification, ToastNotificationManager, ToastNotifier};
 
 use crate::error::PlatformError;
 use crate::toast::toast_xml;
@@ -26,8 +26,11 @@ fn err(what: &str, e: impl std::fmt::Display) -> PlatformError {
 }
 
 fn set_string(key: HKEY, name: PCWSTR, value: &str) -> Result<(), PlatformError> {
-    let bytes: Vec<u8> =
-        value.encode_utf16().chain(std::iter::once(0)).flat_map(u16::to_le_bytes).collect();
+    let bytes: Vec<u8> = value
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .flat_map(u16::to_le_bytes)
+        .collect();
     // SAFETY: `key` is an open registry key and `bytes` is a valid NUL-terminated UTF-16 buffer.
     unsafe { RegSetValueExW(key, name, None, REG_SZ, Some(&bytes)) }
         .ok()
@@ -86,8 +89,10 @@ impl Toaster {
 
     pub fn show(&self, title: &str, body: &str) -> Result<(), PlatformError> {
         let doc = XmlDocument::new().map_err(|e| err("xml", e))?;
-        doc.LoadXml(&HSTRING::from(toast_xml(title, body))).map_err(|e| err("xml", e))?;
-        let toast = ToastNotification::CreateToastNotification(&doc).map_err(|e| err("toast", e))?;
+        doc.LoadXml(&HSTRING::from(toast_xml(title, body)))
+            .map_err(|e| err("xml", e))?;
+        let toast =
+            ToastNotification::CreateToastNotification(&doc).map_err(|e| err("toast", e))?;
         self.notifier.Show(&toast).map_err(|e| err("show", e))
     }
 }

@@ -48,22 +48,39 @@ where
 
 impl Recorder for CpalRecorder {
     fn start(&mut self) -> Result<(), AudioError> {
-        let device = cpal::default_host().default_input_device().ok_or(AudioError::NoInputDevice)?;
-        let supported = device.default_input_config().map_err(|e| AudioError::Stream(e.to_string()))?;
+        let device = cpal::default_host()
+            .default_input_device()
+            .ok_or(AudioError::NoInputDevice)?;
+        let supported = device
+            .default_input_config()
+            .map_err(|e| AudioError::Stream(e.to_string()))?;
         let format = supported.sample_format();
         let config: StreamConfig = supported.into();
-        self.buffer.lock().map_err(|e| AudioError::Stream(e.to_string()))?.clear();
+        self.buffer
+            .lock()
+            .map_err(|e| AudioError::Stream(e.to_string()))?
+            .clear();
         self.lost.store(false, Ordering::Relaxed);
         let (buffer, lost) = (self.buffer.clone(), self.lost.clone());
         let stream = match format {
             SampleFormat::F32 => build_stream::<f32>(&device, config, buffer, lost),
             SampleFormat::I16 => build_stream::<i16>(&device, config, buffer, lost),
             SampleFormat::U16 => build_stream::<u16>(&device, config, buffer, lost),
-            other => return Err(AudioError::Stream(format!("unsupported sample format {other:?}"))),
+            other => {
+                return Err(AudioError::Stream(format!(
+                    "unsupported sample format {other:?}"
+                )))
+            }
         }
         .map_err(|e| AudioError::Stream(e.to_string()))?;
-        stream.play().map_err(|e| AudioError::Stream(e.to_string()))?;
-        self.capture = Some(Capture { stream, sample_rate: config.sample_rate, channels: config.channels });
+        stream
+            .play()
+            .map_err(|e| AudioError::Stream(e.to_string()))?;
+        self.capture = Some(Capture {
+            stream,
+            sample_rate: config.sample_rate,
+            channels: config.channels,
+        });
         Ok(())
     }
 
@@ -72,12 +89,24 @@ impl Recorder for CpalRecorder {
     }
 
     fn stop(&mut self) -> Result<AudioClip, AudioError> {
-        let capture = self.capture.take().ok_or_else(|| AudioError::Stream("not recording".into()))?;
+        let capture = self
+            .capture
+            .take()
+            .ok_or_else(|| AudioError::Stream("not recording".into()))?;
         drop(capture.stream);
         if self.lost.swap(false, Ordering::Relaxed) {
             return Err(AudioError::DeviceLost);
         }
-        let samples = std::mem::take(&mut *self.buffer.lock().map_err(|e| AudioError::Stream(e.to_string()))?);
-        Ok(to_whisper_input(&samples, capture.sample_rate, capture.channels))
+        let samples = std::mem::take(
+            &mut *self
+                .buffer
+                .lock()
+                .map_err(|e| AudioError::Stream(e.to_string()))?,
+        );
+        Ok(to_whisper_input(
+            &samples,
+            capture.sample_rate,
+            capture.channels,
+        ))
     }
 }

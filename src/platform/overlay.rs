@@ -9,15 +9,16 @@ use std::mem::size_of;
 use windows::core::w;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject, AC_SRC_ALPHA,
-    AC_SRC_OVER, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS, HGDIOBJ,
+    CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject,
+    AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS,
+    HGDIOBJ,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, KillTimer, RegisterClassW, SetTimer,
-    SetWindowPos, ShowWindow, UpdateLayeredWindow, HWND_TOPMOST, SM_CXSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SW_HIDE, SW_SHOWNOACTIVATE, ULW_ALPHA, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, KillTimer, RegisterClassW,
+    SetTimer, SetWindowPos, ShowWindow, UpdateLayeredWindow, HWND_TOPMOST, SM_CXSCREEN,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_HIDE, SW_SHOWNOACTIVATE, ULW_ALPHA, WNDCLASSW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 use crate::app::{TrayState, UiEvent};
@@ -29,7 +30,12 @@ const TOP_MARGIN: i32 = 12;
 const ICON_SIZE: u32 = 32;
 const ICON_RGBA: &[u8] = include_bytes!("../../resources/tray-32.rgba");
 
-unsafe extern "system" fn overlay_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+unsafe extern "system" fn overlay_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     // SAFETY: plain default handling of every message.
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
@@ -59,7 +65,11 @@ impl Overlay {
             RegisterClassW(&wc); // already-registered is fine
             let x = (GetSystemMetrics(SM_CXSCREEN) - OVERLAY_WIDTH as i32) / 2;
             let hwnd = CreateWindowExW(
-                WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+                WS_EX_LAYERED
+                    | WS_EX_TRANSPARENT
+                    | WS_EX_TOPMOST
+                    | WS_EX_TOOLWINDOW
+                    | WS_EX_NOACTIVATE,
                 class,
                 w!("wdys hands-free"),
                 WS_POPUP,
@@ -73,7 +83,11 @@ impl Overlay {
                 None,
             )
             .map_err(|e| err("window", e))?;
-            Ok(Overlay { hwnd, bright: true, timer: None })
+            Ok(Overlay {
+                hwnd,
+                bright: true,
+                timer: None,
+            })
         }
     }
 
@@ -106,7 +120,15 @@ impl Overlay {
         // SAFETY: showing our own window without activating it, then starting a thread timer.
         unsafe {
             let _ = ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
-            let _ = SetWindowPos(self.hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            let _ = SetWindowPos(
+                self.hwnd,
+                Some(HWND_TOPMOST),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
             let id = SetTimer(None, 0, PULSE_MS, None);
             self.timer = (id != 0).then_some(id);
         }
@@ -134,16 +156,25 @@ impl Overlay {
             biCompression: BI_RGB.0,
             ..Default::default()
         };
-        let info = BITMAPINFO { bmiHeader: header, ..Default::default() };
+        let info = BITMAPINFO {
+            bmiHeader: header,
+            ..Default::default()
+        };
         // SAFETY: standard layered-window painting; every GDI object created here is released below,
         // and `bits` points to a buffer of exactly width*height*4 bytes owned by the DIB section.
         unsafe {
             let screen = GetDC(None);
             let memory = CreateCompatibleDC(Some(screen));
             let mut bits: *mut c_void = std::ptr::null_mut();
-            if let Ok(bitmap) = CreateDIBSection(Some(memory), &info, DIB_RGB_COLORS, &mut bits, None, 0) {
+            if let Ok(bitmap) =
+                CreateDIBSection(Some(memory), &info, DIB_RGB_COLORS, &mut bits, None, 0)
+            {
                 if !bits.is_null() {
-                    std::ptr::copy_nonoverlapping(frame.bgra.as_ptr(), bits as *mut u8, frame.bgra.len());
+                    std::ptr::copy_nonoverlapping(
+                        frame.bgra.as_ptr(),
+                        bits as *mut u8,
+                        frame.bgra.len(),
+                    );
                     let previous = SelectObject(memory, HGDIOBJ(bitmap.0));
                     let blend = BLENDFUNCTION {
                         BlendOp: AC_SRC_OVER as u8,
@@ -151,7 +182,10 @@ impl Overlay {
                         SourceConstantAlpha: 255,
                         AlphaFormat: AC_SRC_ALPHA as u8,
                     };
-                    let size = SIZE { cx: frame.width as i32, cy: frame.height as i32 };
+                    let size = SIZE {
+                        cx: frame.width as i32,
+                        cy: frame.height as i32,
+                    };
                     let _ = UpdateLayeredWindow(
                         self.hwnd,
                         Some(screen),

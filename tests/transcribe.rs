@@ -34,12 +34,21 @@ const IDLE: u64 = 1000;
 fn lazy() -> (LazyModel, Rc<Cell<u32>>, Rc<Cell<bool>>) {
     let loads = Rc::new(Cell::new(0));
     let fail_next = Rc::new(Cell::new(false));
-    let loader = CountingLoader { loads: loads.clone(), fail_next: fail_next.clone() };
-    (LazyModel::new(Box::new(loader), PathBuf::from("m.bin"), IDLE), loads, fail_next)
+    let loader = CountingLoader {
+        loads: loads.clone(),
+        fail_next: fail_next.clone(),
+    };
+    (
+        LazyModel::new(Box::new(loader), PathBuf::from("m.bin"), IDLE),
+        loads,
+        fail_next,
+    )
 }
 
 fn clip() -> AudioClip {
-    AudioClip { samples: vec![0.0; 16_000] }
+    AudioClip {
+        samples: vec![0.0; 16_000],
+    }
 }
 
 #[test]
@@ -89,7 +98,10 @@ fn reloads_after_unload() {
 fn load_failure_surfaces_as_error_and_retries_next_time() {
     let (mut model, loads, fail_next) = lazy();
     fail_next.set(true);
-    assert!(matches!(model.transcribe(&clip(), 0), Err(TranscribeError::Load(_))));
+    assert!(matches!(
+        model.transcribe(&clip(), 0),
+        Err(TranscribeError::Load(_))
+    ));
     assert!(!model.is_loaded());
     fail_next.set(false);
     assert_eq!(model.transcribe(&clip(), 5).unwrap(), "hello");

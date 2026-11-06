@@ -19,7 +19,11 @@ struct FakeDownloader {
 
 impl FakeDownloader {
     fn new(bytes: &'static [u8]) -> Self {
-        Self { bytes, fail_after_write: false, calls: Cell::new(0) }
+        Self {
+            bytes,
+            fail_after_write: false,
+            calls: Cell::new(0),
+        }
     }
 }
 
@@ -41,7 +45,10 @@ struct FakeConsent {
 
 impl FakeConsent {
     fn new(answer: bool) -> Self {
-        Self { answer, asked: Cell::new(0) }
+        Self {
+            answer,
+            asked: Cell::new(0),
+        }
     }
 }
 
@@ -53,8 +60,10 @@ impl Consent for FakeConsent {
 }
 
 fn file_names(dir: &Path) -> Vec<String> {
-    let mut names: Vec<String> =
-        fs::read_dir(dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
     names.sort();
     names
 }
@@ -62,8 +71,14 @@ fn file_names(dir: &Path) -> Vec<String> {
 #[test]
 fn model_files_are_named_per_size_and_pinned() {
     let dir = Path::new("/models");
-    assert_eq!(model_path(dir, ModelSize::BaseEn), dir.join("ggml-base.en.bin"));
-    assert_eq!(model_path(dir, ModelSize::SmallEn), dir.join("ggml-small.en.bin"));
+    assert_eq!(
+        model_path(dir, ModelSize::BaseEn),
+        dir.join("ggml-base.en.bin")
+    );
+    assert_eq!(
+        model_path(dir, ModelSize::SmallEn),
+        dir.join("ggml-small.en.bin")
+    );
     for size in [ModelSize::BaseEn, ModelSize::SmallEn] {
         assert_eq!(model_sha256(size).len(), 64);
         assert!(model_url(size).starts_with("https://huggingface.co/ggerganov/whisper.cpp/"));
@@ -76,7 +91,10 @@ fn verify_checksum_accepts_match_and_rejects_mismatch() {
     let path = dir.path().join("m.bin");
     fs::write(&path, GOOD).unwrap();
     assert!(verify_checksum(&path, GOOD_SHA).is_ok());
-    assert!(matches!(verify_checksum(&path, &"0".repeat(64)), Err(ModelError::ChecksumMismatch { .. })));
+    assert!(matches!(
+        verify_checksum(&path, &"0".repeat(64)),
+        Err(ModelError::ChecksumMismatch { .. })
+    ));
 }
 
 #[test]
@@ -131,8 +149,17 @@ fn corrupt_existing_model_is_redownloaded() {
 #[test]
 fn downloader_failure_leaves_no_files() {
     let dir = tempfile::tempdir().unwrap();
-    let dl = FakeDownloader { fail_after_write: true, ..FakeDownloader::new(GOOD) };
-    let result = ensure_model(dir.path(), ModelSize::BaseEn, &dl, &FakeConsent::new(true), GOOD_SHA);
+    let dl = FakeDownloader {
+        fail_after_write: true,
+        ..FakeDownloader::new(GOOD)
+    };
+    let result = ensure_model(
+        dir.path(),
+        ModelSize::BaseEn,
+        &dl,
+        &FakeConsent::new(true),
+        GOOD_SHA,
+    );
     assert!(matches!(result, Err(ModelError::Download(_))));
     assert!(file_names(dir.path()).is_empty());
 }
@@ -142,7 +169,13 @@ fn mismatched_existing_model_is_kept_when_download_is_declined() {
     let dir = tempfile::tempdir().unwrap();
     let existing = model_path(dir.path(), ModelSize::BaseEn);
     fs::write(&existing, b"user placed this by hand").unwrap();
-    let result = ensure_model(dir.path(), ModelSize::BaseEn, &FakeDownloader::new(GOOD), &FakeConsent::new(false), GOOD_SHA);
+    let result = ensure_model(
+        dir.path(),
+        ModelSize::BaseEn,
+        &FakeDownloader::new(GOOD),
+        &FakeConsent::new(false),
+        GOOD_SHA,
+    );
     assert!(matches!(result, Err(ModelError::DownloadDeclined)));
     assert_eq!(fs::read(&existing).unwrap(), b"user placed this by hand");
 }
@@ -152,7 +185,13 @@ fn mismatched_existing_model_is_kept_when_download_fails_verification() {
     let dir = tempfile::tempdir().unwrap();
     let existing = model_path(dir.path(), ModelSize::BaseEn);
     fs::write(&existing, b"user placed this by hand").unwrap();
-    let result = ensure_model(dir.path(), ModelSize::BaseEn, &FakeDownloader::new(b"tampered"), &FakeConsent::new(true), GOOD_SHA);
+    let result = ensure_model(
+        dir.path(),
+        ModelSize::BaseEn,
+        &FakeDownloader::new(b"tampered"),
+        &FakeConsent::new(true),
+        GOOD_SHA,
+    );
     assert!(matches!(result, Err(ModelError::ChecksumMismatch { .. })));
     assert_eq!(fs::read(&existing).unwrap(), b"user placed this by hand");
 }

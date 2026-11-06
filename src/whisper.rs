@@ -28,7 +28,12 @@ impl SpeechModel for WhisperModel {
         params.set_print_realtime(false);
         params.set_print_timestamps(false);
         state.full(params, &clip.samples).map_err(inference)?;
-        Ok(state.as_iter().map(|segment| segment.to_string()).collect::<String>().trim().to_string())
+        Ok(state
+            .as_iter()
+            .map(|segment| segment.to_string())
+            .collect::<String>()
+            .trim()
+            .to_string())
     }
 }
 
@@ -37,7 +42,9 @@ pub struct WhisperLoader;
 
 impl ModelLoader for WhisperLoader {
     fn load(&self, path: &Path) -> Result<Box<dyn SpeechModel>, TranscribeError> {
-        let path = path.to_str().ok_or_else(|| TranscribeError::Load("model path is not valid UTF-8".into()))?;
+        let path = path
+            .to_str()
+            .ok_or_else(|| TranscribeError::Load("model path is not valid UTF-8".into()))?;
         let context = WhisperContext::new_with_params(path, WhisperContextParameters::default())
             .map_err(|e| TranscribeError::Load(e.to_string()))?;
         let cores = thread::available_parallelism().map_or(1, |n| n.get());

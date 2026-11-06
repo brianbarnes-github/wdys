@@ -28,7 +28,9 @@ fn downmix_averages_channels() {
 
 #[test]
 fn silent_clip_is_detected() {
-    assert!(is_effectively_silent(&AudioClip { samples: vec![0.0; 16_000] }));
+    assert!(is_effectively_silent(&AudioClip {
+        samples: vec![0.0; 16_000]
+    }));
 }
 
 #[test]

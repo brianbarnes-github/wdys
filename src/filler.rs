@@ -1,4 +1,6 @@
-const FILLERS: &[&str] = &["um", "umm", "uh", "uhh", "ah", "ahh", "er", "erm", "hm", "hmm"];
+const FILLERS: &[&str] = &[
+    "um", "umm", "uh", "uhh", "ah", "ahh", "er", "erm", "hm", "hmm",
+];
 const STUTTER_MAX_LEN: usize = 3;
 const SENTENCE_END: &[char] = &['.', '!', '?'];
 
@@ -16,8 +18,14 @@ fn split_token(token: &str) -> Token<'_> {
         .find(|(_, c)| c.is_alphanumeric())
         .map(|(i, c)| i + c.len_utf8());
     match (start, end) {
-        (Some((s, _)), Some(e)) => Token { core: &token[s..e], trail: &token[e..] },
-        _ => Token { core: "", trail: "" },
+        (Some((s, _)), Some(e)) => Token {
+            core: &token[s..e],
+            trail: &token[e..],
+        },
+        _ => Token {
+            core: "",
+            trail: "",
+        },
     }
 }
 
@@ -94,15 +102,25 @@ pub fn clean_transcript(raw: &str) -> String {
         let token = split_token(word);
         if is_filler(token.core) {
             capitalize_next = out.last().is_none_or(|last| ends_sentence(last));
-            if let (Some(terminal), false) = (token.trail.chars().find(|c| SENTENCE_END.contains(c)), out.is_empty()) {
+            if let (Some(terminal), false) = (
+                token.trail.chars().find(|c| SENTENCE_END.contains(c)),
+                out.is_empty(),
+            ) {
                 attach_terminal(&mut out, terminal);
             }
             continue;
         }
-        if out.last().is_some_and(|prev| is_stutter_of(prev, token.core)) {
+        if out
+            .last()
+            .is_some_and(|prev| is_stutter_of(prev, token.core))
+        {
             out.pop();
         }
-        out.push(if capitalize_next { capitalize_first(word) } else { word.to_string() });
+        out.push(if capitalize_next {
+            capitalize_first(word)
+        } else {
+            word.to_string()
+        });
         capitalize_next = false;
     }
     out.join(" ")

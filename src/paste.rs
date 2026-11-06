@@ -1,0 +1,59 @@
+use std::time::Duration;
+
+use crate::config::VirtualKey;
+use crate::error::PasteError;
+
+pub trait Clipboard {
+    fn get_text(&mut self) -> Result<Option<String>, PasteError>;
+    fn set_text(&mut self, text: &str, exclude_from_history: bool) -> Result<(), PasteError>;
+    fn clear(&mut self) -> Result<(), PasteError>;
+}
+
+pub trait Keyboard {
+    fn send_paste(&mut self) -> Result<(), PasteError>;
+    fn is_down(&self, key: VirtualKey) -> bool;
+}
+
+const RELEASE_POLL: Duration = Duration::from_millis(10);
+const RELEASE_MAX_POLLS: u32 = 100;
+const RESTORE_DELAY: Duration = Duration::from_millis(150);
+
+fn wait_for_release(
+    keyboard: &impl Keyboard,
+    hotkey: VirtualKey,
+    sleep: &dyn Fn(Duration),
+) -> Result<(), PasteError> {
+    for _ in 0..RELEASE_MAX_POLLS {
+        if !keyboard.is_down(hotkey) {
+            return Ok(());
+        }
+        sleep(RELEASE_POLL);
+    }
+    Err(PasteError::HotkeyStillHeld)
+}
+
+/// Pastes `text` into the focused app via the clipboard, then restores the previous
+/// text content. Empty text is a no-op that leaves the clipboard untouched.
+pub fn paste_text(
+    clipboard: &mut impl Clipboard,
+    keyboard: &mut impl Keyboard,
+    hotkey: VirtualKey,
+    text: &str,
+    sleep: &dyn Fn(Duration),
+) -> Result<(), PasteError> {
+    if text.is_empty() {
+        return Ok(());
+    }
+    wait_for_release(keyboard, hotkey, sleep)?;
+
+    let previous = clipboard.get_text()?;
+    clipboard.set_text(text, true)?;
+    let pasted = keyboard.send_paste();
+    sleep(RESTORE_DELAY);
+    let restored = match previous {
+        Some(previous) => clipboard.set_text(&previous, false),
+        None => clipboard.clear(),
+    };
+    pasted?;
+    restored
+}

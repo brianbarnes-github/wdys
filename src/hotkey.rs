@@ -81,3 +81,9 @@ pub fn step(cfg: &FsmConfig, state: State, input: Input, now: Millis) -> (State,
         (WaitingRelease, _) => (WaitingRelease, vec![]),
     }
 }
+
+/// True when the tracker thinks the hotkey is held but the OS says it is up,
+/// meaning a key-up event was lost and one must be synthesized.
+pub fn should_synthesize_keyup(believed_down: bool, actually_down: bool) -> bool {
+    believed_down && !actually_down
+}

@@ -114,3 +114,12 @@ fn fsm_config_is_derived_from_app_config() {
     let fsm = FsmConfig::from(&Config::default());
     assert_eq!(fsm, FsmConfig { min_hold: 300, double_press_window: 400, max_recording: 120_000 });
 }
+
+#[test]
+fn synthesizes_keyup_only_when_believed_down_but_actually_up() {
+    use wdys::hotkey::should_synthesize_keyup;
+    assert!(should_synthesize_keyup(true, false));
+    assert!(!should_synthesize_keyup(true, true));
+    assert!(!should_synthesize_keyup(false, false));
+    assert!(!should_synthesize_keyup(false, true));
+}

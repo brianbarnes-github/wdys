@@ -62,3 +62,13 @@ pub enum AppError {
     #[error(transparent)]
     Paste(#[from] PasteError),
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum HookError {
+    #[error("could not install keyboard hook: {0}")]
+    Install(String),
+    #[error("a keyboard hook is already installed")]
+    AlreadyInstalled,
+    #[error("timed out waiting for a key press")]
+    CaptureTimeout,
+}

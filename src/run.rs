@@ -17,7 +17,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use wdys::app::{run_worker, App, Cue, UiEvent};
 use wdys::config::{self, Config, ModelSize, VirtualKey};
-use wdys::error::{InstanceError, TranscribeError};
+use wdys::error::InstanceError;
 use wdys::hotkey::{Input, Millis};
 use wdys::model_store::{ensure_model, model_path, model_sha256, Consent, UreqDownloader};
 use wdys::platform::autostart;
@@ -28,7 +28,7 @@ use wdys::platform::instance;
 use wdys::platform::keyboard::WinKeyboard;
 use wdys::platform::recorder::CpalRecorder;
 use wdys::platform::tray::{MenuAction, TrayUi};
-use wdys::transcribe::{LazyModel, ModelLoader, SpeechModel};
+use wdys::transcribe::{LazyModel, ModelLoader};
 
 const TICK_INTERVAL: Duration = Duration::from_millis(200);
 const HOTKEY_CAPTURE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -87,6 +87,9 @@ fn make_loader() -> Box<dyn ModelLoader> {
 
 #[cfg(not(feature = "whisper"))]
 fn make_loader() -> Box<dyn ModelLoader> {
+    use wdys::error::TranscribeError;
+    use wdys::transcribe::SpeechModel;
+
     struct Unavailable;
     impl ModelLoader for Unavailable {
         fn load(&self, _path: &Path) -> Result<Box<dyn SpeechModel>, TranscribeError> {
